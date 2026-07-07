@@ -1,10 +1,26 @@
-import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-let cached: SupabaseClient | null = null;
-export function createSupabaseAdminClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceRole = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !serviceRole) return null;
-  if (!cached) cached = createClient(url, serviceRole, { auth: { persistSession: false } });
-  return cached;
+import { createClient } from "@supabase/supabase-js";
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+export function createAdminSupabaseClient() {
+  if (!supabaseUrl || !serviceRoleKey) return null;
+
+  return createClient(supabaseUrl, serviceRoleKey, {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false
+    }
+  });
 }
-export function getStorageBucket() { return process.env.SUPABASE_STORAGE_BUCKET || "servidor-cejas"; }
+
+/**
+ * Alias de compatibilidade.
+ * Alguns arquivos antigos do sistema chamam createSupabaseAdminClient.
+ * Mantemos esse nome para não quebrar dashboard, financeiro e rotas antigas.
+ */
+export const createSupabaseAdminClient = createAdminSupabaseClient;
+
+export function getStorageBucket() {
+  return process.env.SUPABASE_STORAGE_BUCKET || "servidor-cejas";
+}
