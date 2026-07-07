@@ -11,7 +11,7 @@ export const dashboardSeed: DashboardSummary = {
   gratuitiesLoss: 0,
   cashBalance: 0,
   source: "Supabase Database • aguardando primeiro relatório/importação",
-  updatedAt: new Date().toISOString(),
+  updatedAt: "",
   monthlyRevenue: []
 };
 

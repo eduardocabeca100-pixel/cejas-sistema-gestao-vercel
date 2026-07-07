@@ -60,7 +60,7 @@ export default function DashboardPage() {
       <PageHeader
         eyebrow="SISTEMA DE GESTÃO CEJAS"
         title="Dashboard de Resultados"
-        description={`Sistema limpo • Atualizado em ${new Date(summary.updatedAt).toLocaleString("pt-BR")}`}
+        description={`Sistema limpo • Atualizado em ${summary.updatedAt ? new Date(summary.updatedAt).toLocaleString("pt-BR") : "carregando..."}`}
         actions={<><TextInput className="search-global" placeholder="Buscar em todo o sistema..." /><Button onClick={loadDashboard}>Atualizar dados</Button><Link href="/"><Button variant="dark">Sair</Button></Link></>}
       />
 
