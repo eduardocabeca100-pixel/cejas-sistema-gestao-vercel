@@ -15,13 +15,7 @@ export async function POST(request: NextRequest) {
   if (downloadError || !blob) return NextResponse.json({ ok: false, error: downloadError?.message || "Não foi possível ler o PDF enviado." }, { status: 500 });
 
   const buffer = Buffer.from(await blob.arrayBuffer());
-  let text = "";
-  try {
-    text = await tryExtractPdfText(buffer);
-  } catch (error) {
-    const detail = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
-    return NextResponse.json({ ok: false, error: `Não foi possível extrair texto do PDF (${detail}).` }, { status: 422 });
-  }
+  const text = await tryExtractPdfText(buffer).catch(() => "");
   if (!text) return NextResponse.json({ ok: false, error: "Não foi possível extrair texto do PDF. Confirme que é um PDF gerado pelo Supera, não uma imagem escaneada." }, { status: 422 });
 
   const { events, warnings } = parseAgendamentosSalas(text);

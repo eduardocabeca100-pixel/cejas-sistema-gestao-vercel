@@ -1,5 +1,9 @@
 export async function tryExtractPdfText(buffer: Buffer): Promise<string> {
-  const mod = (await import("pdf-parse")) as any;
+  // Importa "pdf-parse/lib/pdf-parse.js" (não o pacote raiz) porque o index.js do
+  // pdf-parse@1.1.1 roda um bloco de "modo debug" (`!module.parent`) como efeito
+  // colateral do import, que em bundles serverless quebra e tenta ler um PDF de
+  // teste que não existe no build (ENOENT), derrubando a extração inteira.
+  const mod = (await import("pdf-parse/lib/pdf-parse.js")) as any;
   const pdfParse = mod.default || mod;
   const result = await pdfParse(buffer);
   return result.text || "";
