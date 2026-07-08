@@ -10,6 +10,7 @@ import {
   type TipoDiaOrcamento
 } from "@/lib/orcamentos/catalogo-cejas";
 import type { Budget } from "@/types";
+import { useCurrentUser } from "@/lib/auth/user-context";
 
 type ItemEditavel = CatalogoOrcamentoItem & {
   id: string;
@@ -105,9 +106,9 @@ const css = `
   height: calc(100vh - 72px);
   overflow: hidden;
   display: grid;
-  grid-template-columns: 420px minmax(760px, 1fr);
-  gap: 28px;
-  padding: 18px;
+  grid-template-columns: minmax(460px, 540px) minmax(760px, 1fr);
+  gap: 32px;
+  padding: 22px;
   align-items: start;
 }
 
@@ -118,14 +119,14 @@ const css = `
   overflow-x: hidden;
   background: #ffffff;
   border-radius: 18px;
-  padding: 20px;
+  padding: 26px;
   box-shadow: 0 18px 40px rgba(15,23,42,.14);
 }
 
 .cejas-editor-section {
   border-bottom: 1px solid #e5e7eb;
-  padding-bottom: 18px;
-  margin-bottom: 20px;
+  padding-bottom: 22px;
+  margin-bottom: 24px;
 }
 
 .cejas-editor-section:last-child {
@@ -144,8 +145,8 @@ const css = `
 
 .cejas-field {
   display: grid;
-  gap: 6px;
-  margin-bottom: 10px;
+  gap: 7px;
+  margin-bottom: 14px;
   min-width: 0;
 }
 
@@ -170,9 +171,9 @@ const css = `
   border-radius: 12px !important;
   background: #f8fafc !important;
   color: #1f2937 !important;
-  padding: 12px 14px !important;
+  padding: 13px 14px !important;
   outline: none !important;
-  font-size: 11px !important;
+  font-size: 13px !important;
   box-shadow: none !important;
   appearance: none;
 }
@@ -730,10 +731,11 @@ function dividirItensEmPaginas(itens: ItemOrcamento[]): ItemOrcamento[][] {
 }
 
 export default function OrcamentosPage() {
+  const currentUser = useCurrentUser();
   const [catalogo, setCatalogo] = useState<ItemEditavel[]>(criarCatalogoInicial);
   const [tipoCliente, setTipoCliente] = useState<TipoClienteOrcamento>("naoAssociado");
   const [tipoDia, setTipoDia] = useState<TipoDiaOrcamento>("diasUteis");
-  const [emissor, setEmissor] = useState("EDUARDO");
+  const [emissor, setEmissor] = useState(() => currentUser?.name || "");
   const [solicitante, setSolicitante] = useState("");
   const [evento, setEvento] = useState("");
   const [infos, setInfos] = useState("");
@@ -1263,12 +1265,13 @@ ${area.innerHTML}
           {!orcamentosSalvos.length && <p style={{ color: "#6b7280" }}>Nenhum orçamento salvo ainda.</p>}
           {Boolean(orcamentosSalvos.length) && (
             <table className="paper-table" style={{ width: "100%" }}>
-              <thead><tr><th>Empresa</th><th>Evento</th><th>Total</th><th>Status</th></tr></thead>
+              <thead><tr><th>Empresa</th><th>Evento</th><th>Emitido por</th><th>Total</th><th>Status</th></tr></thead>
               <tbody>
                 {orcamentosSalvos.map((budget) => (
                   <tr key={budget.id}>
                     <td>{budget.company}</td>
                     <td>{budget.eventName}</td>
+                    <td>{budget.issuer || "—"}</td>
                     <td>{formatarMoeda(budget.total)}</td>
                     <td>{budget.status}</td>
                   </tr>

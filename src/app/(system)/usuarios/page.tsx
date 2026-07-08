@@ -7,8 +7,9 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Field, SelectInput, TextInput } from "@/components/ui/Form";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { APP_MODULES } from "@/lib/modules";
 
-const permissionOptions = ["Painel Geral", "Agenda Dinâmica", "Orçamentos", "Importar Relatório PDF", "Tarefas Pendentes", "Financeiro", "Servidor", "Gratuidades", "Configurações"];
+const permissionOptions = APP_MODULES.filter((module) => !module.alwaysVisible && !module.superadminOnly).map((module) => module.permissionLabel);
 
 export default function UsuariosPage() {
   const [users, setUsers] = useState<AppUser[]>([]);

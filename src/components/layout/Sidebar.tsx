@@ -3,16 +3,16 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { cx } from "@/lib/utils";
 import type { SessionPayload } from "@/lib/auth/session";
-
-const navItems = [
-  { href: "/dashboard", label: "Painel Geral", icon: "▦" }, { href: "/agenda", label: "Agenda Dinâmica", icon: "▣" }, { href: "/painel-do-dia", label: "Painel do Dia", icon: "▤" }, { href: "/chat", label: "Chat Interno", icon: "💬" }, { href: "/orcamentos", label: "Orçamentos", icon: "◎" }, { href: "/financeiro", label: "Financeiro", icon: "💰" }, { href: "/gratuidades", label: "Gratuidades", icon: "☞" }, { href: "/tarefas", label: "Tarefas Pendentes", icon: "☑" }, { href: "/servidor", label: "Servidor", icon: "▣" }, { href: "/contratos", label: "Contratos", icon: "▥" }, { href: "/importar-relatorio", label: "Importar Relatório (PDF)", icon: "▤" }, { href: "/usuarios", label: "Acessos / Usuários", icon: "•" }, { href: "/configuracoes", label: "Configurações", icon: "⊙" }
-];
+import { APP_MODULES, podeAcessarModulo } from "@/lib/modules";
 
 export function Sidebar({ user }: { user: SessionPayload | null }) {
   const pathname = usePathname();
   const router = useRouter();
   const nome = user?.name || "Usuário";
   const cargo = user?.isSuperadmin ? "Superadmin" : (user?.role || "");
+  const permissions = user?.permissions || [];
+  const isSuperadmin = Boolean(user?.isSuperadmin);
+  const navItems = APP_MODULES.filter((module) => podeAcessarModulo(module, isSuperadmin, permissions));
 
   async function sair() {
     await fetch("/api/logout", { method: "POST" });
@@ -26,7 +26,7 @@ export function Sidebar({ user }: { user: SessionPayload | null }) {
         <div className="brand-mark">M</div>
         <div><strong>SISTEMA DE GESTÃO<br />CEJAS</strong><span>Painel Administrativo</span></div>
       </Link>
-      <div className="user-card"><div className="avatar">{nome.charAt(0).toUpperCase()}</div><div><strong>{nome}</strong><span>{cargo}</span></div></div>
+      <div className="user-card"><div className="avatar">{nome.charAt(0).toUpperCase()}</div><div><strong>{nome}</strong><span>{cargo}</span>{user?.email && <span style={{ fontSize: 11, opacity: 0.8 }}>{user.email}</span>}</div></div>
       <nav className="side-nav">
         {navItems.map((item) => {
           const active = pathname === item.href || pathname.startsWith(`${item.href}/`);

@@ -1,17 +1,26 @@
 import { NextRequest, NextResponse } from "next/server";
 import { SESSION_COOKIE_NAME, verifySessionToken } from "@/lib/auth/session";
+import { APP_MODULES, podeAcessarModulo } from "@/lib/modules";
 
 export async function middleware(request: NextRequest) {
   const token = request.cookies.get(SESSION_COOKIE_NAME)?.value;
   const session = await verifySessionToken(token);
+  const pathname = request.nextUrl.pathname;
 
   if (!session) {
-    if (request.nextUrl.pathname.startsWith("/api/")) {
+    if (pathname.startsWith("/api/")) {
       return NextResponse.json({ ok: false, error: "Sessão expirada. Faça login novamente." }, { status: 401 });
     }
     const loginUrl = new URL("/", request.url);
     loginUrl.searchParams.set("expirado", "1");
     return NextResponse.redirect(loginUrl);
+  }
+
+  if (!pathname.startsWith("/api/")) {
+    const module = APP_MODULES.find((item) => pathname === item.href || pathname.startsWith(`${item.href}/`));
+    if (module && !podeAcessarModulo(module, session.isSuperadmin, session.permissions)) {
+      return NextResponse.redirect(new URL("/dashboard", request.url));
+    }
   }
 
   return NextResponse.next();
