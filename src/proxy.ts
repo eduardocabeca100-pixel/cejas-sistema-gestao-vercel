@@ -3,7 +3,7 @@ import { SESSION_COOKIE_NAME, verifySessionToken } from "@/lib/auth/session";
 import { hydrateLiveUser } from "@/lib/auth/live-session";
 import { APP_MODULES, podeAcessarModulo } from "@/lib/modules";
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const token = request.cookies.get(SESSION_COOKIE_NAME)?.value;
   const pathname = request.nextUrl.pathname;
   const tokenSession = await verifySessionToken(token);
