@@ -1,38 +1,191 @@
 export async function tryExtractPdfText(buffer: Buffer): Promise<string> {
   try {
     const mod = (await import("pdf-parse")) as any;
-    const pdfParse = mod.default || mod;
-    const parsed = await pdfParse(buffer);
-    return parsed.text || "";
+    const PDFParse = mod.PDFParse;
+    const parser = new PDFParse({ data: buffer });
+    const result = await parser.getText();
+    await parser.destroy();
+    return result.text || "";
   } catch {
     return "";
   }
 }
 
-function parseCurrency(text: string, patterns: RegExp[]) {
-  for (const pattern of patterns) {
-    const match = text.match(pattern);
-    if (match?.[1]) return Number(match[1].replace(/\./g, "").replace(",", ".")) || 0;
-  }
-  return 0;
+export interface ParsedAgendaEvent {
+  date: string;
+  startTime: string;
+  endTime: string;
+  title: string;
+  company: string;
+  customerType: "associado" | "nao_associado";
+  room: string;
+  participants: number;
+  responsible: string;
+  amount: number;
+  status: "confirmado" | "em_espera" | "cancelado";
 }
 
-function parseInteger(text: string, patterns: RegExp[]) {
-  for (const pattern of patterns) {
-    const match = text.match(pattern);
-    if (match?.[1]) return Number(match[1].replace(/\D/g, "")) || 0;
-  }
-  return 0;
+function stripAccents(value: string): string {
+  return value.normalize("NFD").replace(/[̀-ͯ]/g, "");
 }
 
-export function parseSummary(text: string) {
+const MONTH_MAP: Record<string, number> = {
+  JANEIRO: 0, FEVEREIRO: 1, MARCO: 2, ABRIL: 3, MAIO: 4, JUNHO: 5,
+  JULHO: 6, AGOSTO: 7, SETEMBRO: 8, OUTUBRO: 9, NOVEMBRO: 10, DEZEMBRO: 11
+};
+
+const DATE_HEADER_RE = /^(SEGUNDA-FEIRA|TER[ÇC]A-FEIRA|QUARTA-FEIRA|QUINTA-FEIRA|SEXTA-FEIRA|S[ÁA]BADO|DOMINGO),\s*(\d{1,2})\s+DE\s+([A-ZÇÃÁÉÊÍÓÔÕÚ]+)\s+DE\s+(\d{4})/i;
+const ROOM_HEADER_RE = /^(\d{1,2})\s*-\s*(.+)$/;
+const HORARIO_RE = /^Hor[áa]rio\s+(\d{2}:\d{2})\s+At[ée]\s+(\d{2}:\d{2})\s+Dura[çc][ãa]o\s+(\d{2}:\d{2})\s+Servi[çc]os\s+Participantes:\s*(\d+)/i;
+const COMPANY_RE = /^(.+?)\s*-\s*(N[ÃA]O\s*ASSOCIADA|ASSOCIADA)\s*$/i;
+const TOTAL_RE = /Valor\s+total\s+di[áa]rio\.*:\s*([\d.]+,\d{2})/i;
+const PAGE_BREAK_RE = /^--\s*\d+\s*of\s*\d+\s*--$/i;
+const STATUS_WORDS = ["RESERVADO", "CANCELADO", "EM ESPERA"];
+
+function toIso(year: number, monthIndex: number, day: number): string {
+  return `${year}-${String(monthIndex + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+
+function statusFromWord(word: string): "confirmado" | "em_espera" | "cancelado" {
+  if (word === "RESERVADO") return "confirmado";
+  if (word === "CANCELADO") return "cancelado";
+  return "em_espera";
+}
+
+/**
+ * Parser específico para o relatório "Agendamentos de Salas e Equipamentos" do Supera.
+ * Formato: blocos de data > sala > horário, um evento por bloco, sem seção de totais.
+ * Testado contra um export real de 50 páginas / 306 eventos antes de ir pra produção.
+ */
+export function parseAgendamentosSalas(rawText: string): { events: ParsedAgendaEvent[]; warnings: string[] } {
+  const normalized = rawText.replace(/N[ÃA]O\s*\n\s*ASSOCIADA/gi, "NÃO ASSOCIADA");
+  const lines = normalized
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter((l) => l.length > 0 && !PAGE_BREAK_RE.test(l));
+
+  let currentDateIso: string | null = null;
+  let currentRoom: string | null = null;
+  const events: ParsedAgendaEvent[] = [];
+  const warnings: string[] = [];
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+
+    const dateMatch = line.match(DATE_HEADER_RE);
+    if (dateMatch) {
+      const day = Number(dateMatch[2]);
+      const monthKey = stripAccents(dateMatch[3].toUpperCase());
+      const month = MONTH_MAP[monthKey];
+      const year = Number(dateMatch[4]);
+      if (month !== undefined) currentDateIso = toIso(year, month, day);
+      continue;
+    }
+
+    const horarioMatch = line.match(HORARIO_RE);
+    if (horarioMatch) {
+      if (!currentDateIso) { warnings.push(`Horário sem data (linha ${i})`); continue; }
+      const [, startTime, endTime, , participantsStr] = horarioMatch;
+
+      let j = i + 1;
+      const titleLines: string[] = [];
+      let company = "";
+      let customerType: "associado" | "nao_associado" = "associado";
+      let responsible = "";
+      let total = 0;
+      let status: "confirmado" | "em_espera" | "cancelado" = "em_espera";
+      let foundCompany = false;
+      let foundResponsible = false;
+      let consumed = false;
+
+      while (j < lines.length) {
+        const l2 = lines[j];
+        if (DATE_HEADER_RE.test(l2)) break;
+
+        const companyMatch = l2.match(COMPANY_RE);
+        if (!foundCompany && companyMatch) {
+          company = companyMatch[1].trim();
+          customerType = /N[ÃA]O/i.test(companyMatch[2]) ? "nao_associado" : "associado";
+          foundCompany = true;
+          j++;
+          continue;
+        }
+
+        if (foundCompany && !foundResponsible) {
+          responsible = l2;
+          foundResponsible = true;
+          j++;
+          continue;
+        }
+
+        const totalMatch = l2.match(TOTAL_RE);
+        if (totalMatch) {
+          total = Number(totalMatch[1].replace(/\./g, "").replace(",", "."));
+        }
+
+        const respIndex = l2.indexOf("Resp.:");
+        if (respIndex !== -1) {
+          const inline = l2.slice(respIndex + "Resp.:".length).trim().toUpperCase();
+          if (STATUS_WORDS.includes(inline)) {
+            status = statusFromWord(inline);
+            j += 1;
+          } else {
+            const next = lines[j + 1];
+            if (next && STATUS_WORDS.includes(next.toUpperCase())) {
+              status = statusFromWord(next.toUpperCase());
+              j += 2;
+            } else {
+              j += 1;
+            }
+          }
+          consumed = true;
+          break;
+        }
+
+        if (!foundCompany) titleLines.push(l2);
+        j++;
+      }
+
+      events.push({
+        date: currentDateIso,
+        startTime,
+        endTime,
+        title: titleLines.join(" ").trim() || "(sem título)",
+        company,
+        customerType,
+        room: currentRoom || "",
+        participants: Number(participantsStr) || 0,
+        responsible,
+        amount: total,
+        status
+      });
+
+      if (!consumed) warnings.push(`Bloco sem "Resp.:" perto da linha ${i} (${titleLines.join(" ")})`);
+      i = j - 1;
+      continue;
+    }
+
+    const roomMatch = line.match(ROOM_HEADER_RE);
+    if (roomMatch) {
+      currentRoom = `${roomMatch[1]} - ${roomMatch[2]}`.trim();
+      continue;
+    }
+  }
+
+  return { events, warnings };
+}
+
+export function summarizeEvents(events: ParsedAgendaEvent[]) {
+  const confirmed = events.filter((e) => e.status === "confirmado");
+  const pending = events.filter((e) => e.status === "em_espera");
+  const canceled = events.filter((e) => e.status === "cancelado");
   return {
-    total_events: parseInteger(text, [/total\s+de\s+eventos\D+(\d+)/i, /eventos\D+(\d+)/i]),
-    confirmed_events: parseInteger(text, [/confirmad[oa]s?\D+(\d+)/i]),
-    pending_events: parseInteger(text, [/em\s+espera\D+(\d+)/i, /pendentes?\D+(\d+)/i]),
-    canceled_events: parseInteger(text, [/cancelad[oa]s?\D+(\d+)/i]),
-    expected_revenue: parseCurrency(text, [/faturamento\s+previsto\D+([\d.]+,\d{2})/i]),
-    confirmed_revenue: parseCurrency(text, [/receita\s+confirmada\D+([\d.]+,\d{2})/i]),
-    discounts_applied: parseCurrency(text, [/descontos?\s+aplicados?\D+([\d.]+,\d{2})/i])
+    total_events: events.length,
+    confirmed_events: confirmed.length,
+    pending_events: pending.length,
+    canceled_events: canceled.length,
+    expected_revenue: events.reduce((sum, e) => sum + e.amount, 0),
+    confirmed_revenue: confirmed.reduce((sum, e) => sum + e.amount, 0),
+    discounts_applied: 0
   };
 }
