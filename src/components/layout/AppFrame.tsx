@@ -1,2 +1,6 @@
 import { Sidebar } from "@/components/layout/Sidebar";
-export function AppFrame({ children }: { children: React.ReactNode }) { return <div className="app-frame"><Sidebar /><main className="app-main">{children}</main></div>; }
+import type { SessionPayload } from "@/lib/auth/session";
+
+export function AppFrame({ children, user }: { children: React.ReactNode; user: SessionPayload | null }) {
+  return <div className="app-frame"><Sidebar user={user} /><main className="app-main">{children}</main></div>;
+}

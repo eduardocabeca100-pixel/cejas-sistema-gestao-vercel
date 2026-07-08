@@ -1,6 +1,6 @@
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { dashboardSeed } from "@/lib/seed";
-import type { AppUser, Budget, CejasEvent, DashboardSummary, FinanceEntry, Gratuity, ServerFile } from "@/types";
+import type { AppUser, Budget, CejasEvent, ChatMessage, Contract, DashboardSummary, FinanceEntry, Gratuity, ServerFile, Task } from "@/types";
 
 function emptyDashboard(source = "Supabase Database • nenhum dado importado ainda"): DashboardSummary {
   return { ...dashboardSeed, source, updatedAt: new Date().toISOString() };
@@ -168,4 +168,62 @@ export async function getUsers(): Promise<AppUser[]> {
   const { data, error } = await supabase.from("app_users").select("*").order("created_at", { ascending: false });
   if (error || !data) return [];
   return data.map((user) => ({ id: user.id, name: user.name, email: user.email, role: user.role, permissions: user.permissions || [], status: user.status }));
+}
+
+export async function getContracts(): Promise<Contract[]> {
+  const supabase = createSupabaseAdminClient();
+  if (!supabase) return [];
+  const { data, error } = await supabase.from("contracts").select("*").order("created_at", { ascending: false });
+  if (error || !data) return [];
+  return data.map((contract) => ({
+    id: contract.id,
+    client: contract.client,
+    title: contract.title,
+    status: contract.status,
+    storagePath: contract.storage_path || undefined,
+    createdAt: contract.created_at
+  }));
+}
+
+export async function getTasks(): Promise<Task[]> {
+  const supabase = createSupabaseAdminClient();
+  if (!supabase) return [];
+  const { data, error } = await supabase.from("tasks").select("*").order("created_at", { ascending: false });
+  if (error || !data) return [];
+  return data.map((task) => ({
+    id: task.id,
+    title: task.title,
+    description: task.description || "",
+    module: task.module || "",
+    priority: task.priority,
+    dueDate: task.due_date || undefined,
+    status: task.status,
+    createdAt: task.created_at
+  }));
+}
+
+export async function getChatMessages(): Promise<ChatMessage[]> {
+  const supabase = createSupabaseAdminClient();
+  if (!supabase) return [];
+  const { data, error } = await supabase
+    .from("chat_messages")
+    .select("*, app_users(name)")
+    .order("created_at", { ascending: true })
+    .limit(200);
+  if (error || !data) return [];
+  return data.map((message: any) => ({
+    id: message.id,
+    senderId: message.sender_id || undefined,
+    senderName: message.app_users?.name || "Usuário",
+    body: message.body || "",
+    createdAt: message.created_at
+  }));
+}
+
+export async function getSetting(key: string): Promise<Record<string, unknown> | null> {
+  const supabase = createSupabaseAdminClient();
+  if (!supabase) return null;
+  const { data, error } = await supabase.from("settings").select("value").eq("key", key).maybeSingle();
+  if (error || !data) return null;
+  return data.value as Record<string, unknown>;
 }

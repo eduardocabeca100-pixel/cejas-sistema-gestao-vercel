@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { dashboardSeed } from "@/lib/seed";
 import type { DashboardSummary } from "@/types";
 import { formatCurrency, formatNumber } from "@/lib/format/currency";
@@ -23,8 +24,15 @@ const modules = [
 ];
 
 export default function DashboardPage() {
+  const router = useRouter();
   const [summary, setSummary] = useState<DashboardSummary>(dashboardSeed);
   const [loading, setLoading] = useState(false);
+
+  async function sair() {
+    await fetch("/api/logout", { method: "POST" });
+    router.push("/");
+    router.refresh();
+  }
 
   async function loadDashboard() {
     setLoading(true);
@@ -61,7 +69,7 @@ export default function DashboardPage() {
         eyebrow="SISTEMA DE GESTÃO CEJAS"
         title="Dashboard de Resultados"
         description={`Sistema limpo • Atualizado em ${summary.updatedAt ? new Date(summary.updatedAt).toLocaleString("pt-BR") : "carregando..."}`}
-        actions={<><TextInput className="search-global" placeholder="Buscar em todo o sistema..." /><Button onClick={loadDashboard}>Atualizar dados</Button><Link href="/"><Button variant="dark">Sair</Button></Link></>}
+        actions={<><TextInput className="search-global" placeholder="Buscar em todo o sistema..." /><Button onClick={loadDashboard}>Atualizar dados</Button><Button variant="dark" onClick={sair}>Sair</Button></>}
       />
 
       <div className="grid grid-4">

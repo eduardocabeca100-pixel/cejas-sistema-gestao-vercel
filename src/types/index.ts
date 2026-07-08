@@ -106,3 +106,36 @@ export interface AppUser {
   permissions: string[];
   status: "ativo" | "inativo" | string;
 }
+
+export interface Contract {
+  id: string;
+  client: string;
+  title: string;
+  status: string;
+  storagePath?: string;
+  createdAt: string;
+}
+
+export interface Task {
+  id: string;
+  title: string;
+  description?: string;
+  module?: string;
+  priority: string;
+  dueDate?: string;
+  status: string;
+  createdAt: string;
+}
+
+export interface ChatMessage {
+  id: string;
+  senderId?: string;
+  senderName: string;
+  body: string;
+  createdAt: string;
+}
+
+export interface AppSetting {
+  key: string;
+  value: Record<string, unknown>;
+}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   CEJAS_ORCAMENTO_CATALOGO,
   formatarMoeda,
@@ -9,6 +9,7 @@ import {
   type TipoClienteOrcamento,
   type TipoDiaOrcamento
 } from "@/lib/orcamentos/catalogo-cejas";
+import type { Budget } from "@/types";
 
 type ItemEditavel = CatalogoOrcamentoItem & {
   id: string;
@@ -750,6 +751,18 @@ export default function OrcamentosPage() {
     quantidade: 1
   });
   const [itens, setItens] = useState<ItemOrcamento[]>([]);
+  const [orcamentosSalvos, setOrcamentosSalvos] = useState<Budget[]>([]);
+  const [salvando, setSalvando] = useState(false);
+  const [listaAberta, setListaAberta] = useState(false);
+
+  function carregarOrcamentosSalvos() {
+    fetch("/api/orcamentos", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : []))
+      .then(setOrcamentosSalvos)
+      .catch(() => setOrcamentosSalvos([]));
+  }
+
+  useEffect(() => { carregarOrcamentosSalvos(); }, []);
 
   const categorias = useMemo(() => {
     return Array.from(new Set(catalogo.filter((item) => item.ativo).map((item) => item.categoria)));
@@ -864,22 +877,60 @@ export default function OrcamentosPage() {
     setFormCatalogo(criarFormVazio());
   }
 
-  function salvarRascunhoLocal() {
+  async function salvarOrcamento() {
+    if (!solicitante.trim() || !evento.trim()) {
+      alert("Preencha a empresa solicitante e o nome do evento antes de salvar.");
+      return;
+    }
+    if (!itens.length) {
+      alert("Adicione ao menos um item ao orçamento antes de salvar.");
+      return;
+    }
+
+    const primeiroItem = itens[0];
+    const notas = [infos, observacoesCliente ? `Observações ao cliente: ${observacoesCliente}` : ""].filter(Boolean).join("\n\n");
+
     const payload = {
-      emissor,
-      solicitante,
-      evento,
-      infos,
-      observacoesCliente,
+      title: `${evento} — ${solicitante}`,
+      company: solicitante,
+      eventName: evento,
+      issuer: emissor,
+      customerType: tipoCliente === "associado" ? "associado" : "nao_associado",
+      dayType: tipoDia === "diasUteis" ? "dias_uteis" : tipoDia === "sabado" ? "sabado" : "dom_fer",
+      notes: notas,
+      date: primeiroItem?.data || null,
+      startTime: primeiroItem?.inicio || null,
+      endTime: primeiroItem?.fim || null,
+      total: totalFinal,
       status,
-      tipoCliente,
-      tipoDia,
-      desconto,
-      itens
+      items: itens.map((item) => ({
+        rubric: item.categoria,
+        description: item.item,
+        quantity: item.quantidade,
+        unitValue: item.valorUnitario,
+        details: `${item.detalhes} • ${dataBR(item.data)} ${item.inicio}–${item.fim}`.trim()
+      }))
     };
 
-    console.log("Rascunho local do orçamento:", payload);
-    alert("Rascunho local preparado. Depois vamos salvar oficialmente no Supabase.");
+    setSalvando(true);
+    try {
+      const response = await fetch("/api/orcamentos", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      const json = await response.json();
+      if (!json.ok) {
+        alert(`Não foi possível salvar no Supabase: ${json.error}`);
+        return;
+      }
+      alert("Orçamento salvo no Supabase.");
+      carregarOrcamentosSalvos();
+    } catch {
+      alert("Erro de conexão ao salvar o orçamento.");
+    } finally {
+      setSalvando(false);
+    }
   }
 
 
@@ -1198,12 +1249,35 @@ ${area.innerHTML}
 
         <div className="cejas-top-actions">
           <span className="cejas-session-pill">CSS OK • Catálogo oficial: {catalogo.filter((item) => item.ativo).length} itens</span>
+          <button className="cejas-btn" type="button" onClick={() => setListaAberta((v) => !v)}>📋 Orçamentos salvos ({orcamentosSalvos.length})</button>
           <button className="cejas-btn" type="button" onClick={restaurarCatalogo}>Restaurar catálogo oficial</button>
           <button className="cejas-btn" type="button" onClick={() => setModalAberto(true)}>⚙ Cadastro de Itens</button>
           <button className="cejas-btn blue" type="button" onClick={abrirJanelaImpressao}>🖨 Imprimir / PDF A4</button>
-          <button className="cejas-btn magenta" type="button" onClick={salvarRascunhoLocal}>Salvar rascunho local</button>
+          <button className="cejas-btn magenta" type="button" onClick={salvarOrcamento} disabled={salvando}>{salvando ? "Salvando..." : "💾 Salvar no Supabase"}</button>
         </div>
       </header>
+
+      {listaAberta && (
+        <div style={{ background: "#fff", margin: "0 18px", borderRadius: 14, padding: 16, boxShadow: "0 12px 30px rgba(15,23,42,.12)" }}>
+          <h3 style={{ margin: "0 0 10px" }}>Orçamentos salvos no Supabase</h3>
+          {!orcamentosSalvos.length && <p style={{ color: "#6b7280" }}>Nenhum orçamento salvo ainda.</p>}
+          {Boolean(orcamentosSalvos.length) && (
+            <table className="paper-table" style={{ width: "100%" }}>
+              <thead><tr><th>Empresa</th><th>Evento</th><th>Total</th><th>Status</th></tr></thead>
+              <tbody>
+                {orcamentosSalvos.map((budget) => (
+                  <tr key={budget.id}>
+                    <td>{budget.company}</td>
+                    <td>{budget.eventName}</td>
+                    <td>{formatarMoeda(budget.total)}</td>
+                    <td>{budget.status}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      )}
 
       <section className="cejas-orcamento-workspace">
         <aside className="cejas-editor">

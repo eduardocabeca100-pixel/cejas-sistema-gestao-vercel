@@ -9,12 +9,16 @@ create table if not exists app_users (
   id uuid primary key default gen_random_uuid(),
   name text not null,
   email text not null unique,
+  password_hash text,
   role text not null default 'Leitura',
   permissions text[] not null default '{}',
   status text not null default 'ativo',
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+-- Se a tabela app_users já existia (deploy anterior), garante a coluna nova sem apagar dados:
+alter table app_users add column if not exists password_hash text;
 
 create table if not exists reports (
   id uuid primary key default gen_random_uuid(),
