@@ -638,7 +638,7 @@ const css = `
   gap: 8px;
 }
 
-@media (max-width: 1260px) {
+@media (max-width: 1700px) {
   .cejas-orcamento-workspace {
     grid-template-columns: 390px minmax(0,1fr);
   }
