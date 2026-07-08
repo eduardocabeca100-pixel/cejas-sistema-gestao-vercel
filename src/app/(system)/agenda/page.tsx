@@ -11,37 +11,95 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { Badge } from "@/components/ui/Badge";
 
 const weekdays = ["DOM", "SEG", "TER", "QUA", "QUI", "SEX", "SÁB"];
-const days = [28,29,30,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,1];
+const monthNames = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
 
-function dayToIso(day: number, index: number) {
-  if (index < 3) return `2026-06-${String(day).padStart(2, "0")}`;
-  if (index > 33) return `2026-08-${String(day).padStart(2, "0")}`;
-  return `2026-07-${String(day).padStart(2, "0")}`;
+function toIso(year: number, monthIndex: number, day: number) {
+  const date = new Date(year, monthIndex, day);
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
 }
 
+function buildMonthGrid(year: number, monthIndex: number) {
+  const firstDayOfMonth = new Date(year, monthIndex, 1);
+  const startOffset = firstDayOfMonth.getDay();
+  const daysInMonth = new Date(year, monthIndex + 1, 0).getDate();
+  const cells: Array<{ iso: string; day: number; inMonth: boolean }> = [];
+
+  for (let i = 0; i < startOffset; i++) {
+    const day = new Date(year, monthIndex, 1 - (startOffset - i));
+    cells.push({ iso: toIso(day.getFullYear(), day.getMonth(), day.getDate()), day: day.getDate(), inMonth: false });
+  }
+  for (let day = 1; day <= daysInMonth; day++) {
+    cells.push({ iso: toIso(year, monthIndex, day), day, inMonth: true });
+  }
+  while (cells.length % 7 !== 0 || cells.length < 42) {
+    const last = cells[cells.length - 1];
+    const nextDate = new Date(`${last.iso}T00:00:00`);
+    nextDate.setDate(nextDate.getDate() + 1);
+    cells.push({ iso: toIso(nextDate.getFullYear(), nextDate.getMonth(), nextDate.getDate()), day: nextDate.getDate(), inMonth: false });
+    if (cells.length >= 42) break;
+  }
+  return cells;
+}
+
+const statusOptions: Array<{ value: EventStatus; label: string }> = [
+  { value: "confirmado", label: "Confirmar" },
+  { value: "em_espera", label: "Colocar em espera" },
+  { value: "cancelado", label: "Cancelar" }
+];
+
 export default function AgendaPage() {
+  const today = new Date();
   const [events, setEvents] = useState<CejasEvent[]>([]);
   const [status, setStatus] = useState("todos");
   const [room, setRoom] = useState("todas");
-  const [selectedDate, setSelectedDate] = useState("2026-07-02");
+  const [year, setYear] = useState(today.getFullYear());
+  const [month, setMonth] = useState(today.getMonth());
+  const [selectedDate, setSelectedDate] = useState(toIso(today.getFullYear(), today.getMonth(), today.getDate()));
   const [showForm, setShowForm] = useState(false);
+  const [salvandoStatus, setSalvandoStatus] = useState<string | null>(null);
+
+  function carregarEventos() {
+    fetch("/api/events", { cache: "no-store" }).then((r) => r.ok ? r.json() : []).then(setEvents).catch(() => {});
+  }
 
   useEffect(() => {
-    fetch("/api/events", { cache: "no-store" }).then((r) => r.ok ? r.json() : []).then(setEvents).catch(() => setEvents([]));
+    carregarEventos();
+    const interval = setInterval(carregarEventos, 8000);
+    return () => clearInterval(interval);
   }, []);
 
-  const filtered = useMemo(() => events.filter((event) => (status === "todos" || event.status === status) && (room === "todas" || event.room === room)), [events, status, room]);
+  const filtered = useMemo(
+    () => events
+      .filter((event) => (status === "todos" || event.status === status) && (room === "todas" || event.room === room))
+      .sort((a, b) => (a.date === b.date ? a.startTime.localeCompare(b.startTime) : a.date.localeCompare(b.date))),
+    [events, status, room]
+  );
   const selectedEvents = filtered.filter((event) => event.date === selectedDate);
   const confirmed = filtered.filter((event) => event.status === "confirmado");
   const pending = filtered.filter((event) => event.status === "em_espera");
   const canceled = filtered.filter((event) => event.status === "cancelado");
-  const rooms = Array.from(new Set(events.map((event) => event.room)));
+  const rooms = Array.from(new Set(events.map((event) => event.room).filter(Boolean)));
+  const monthGrid = useMemo(() => buildMonthGrid(year, month), [year, month]);
+
+  function irParaMesAnterior() {
+    if (month === 0) { setMonth(11); setYear((y) => y - 1); } else { setMonth((m) => m - 1); }
+  }
+  function irParaProximoMes() {
+    if (month === 11) { setMonth(0); setYear((y) => y + 1); } else { setMonth((m) => m + 1); }
+  }
+  function irParaHoje() {
+    setYear(today.getFullYear());
+    setMonth(today.getMonth());
+    setSelectedDate(toIso(today.getFullYear(), today.getMonth(), today.getDate()));
+  }
 
   async function addManualEvent(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
-    const payload: CejasEvent = {
-      id: `evt-${Date.now()}`,
+    const payload = {
       date: String(form.get("date")),
       startTime: String(form.get("startTime")),
       endTime: String(form.get("endTime")),
@@ -52,11 +110,25 @@ export default function AgendaPage() {
       participants: Number(form.get("participants") || 0),
       responsible: "Eduardo",
       amount: Number(form.get("amount") || 0),
-      status: String(form.get("status")) as EventStatus
+      status: String(form.get("status"))
     };
-    setEvents((current) => [payload, ...current]);
-    await fetch("/api/events", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) }).catch(() => null);
+    const response = await fetch("/api/events", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+    const json = await response.json();
+    if (!json.ok) { alert(json.error); return; }
     setShowForm(false);
+    carregarEventos();
+  }
+
+  async function alterarStatus(eventId: string, novoStatus: EventStatus) {
+    setSalvandoStatus(eventId);
+    try {
+      const response = await fetch("/api/events", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: eventId, status: novoStatus }) });
+      const json = await response.json();
+      if (!json.ok) { alert(json.error); return; }
+      carregarEventos();
+    } finally {
+      setSalvandoStatus(null);
+    }
   }
 
   return (
@@ -64,17 +136,14 @@ export default function AgendaPage() {
       <PageHeader
         eyebrow="AGENDA OPERACIONAL"
         title="Agenda Dinâmica"
-        description="Calendário completo de eventos, salas e status. Filtre por data, status, local/sala, empresa, evento ou responsável."
-        actions={<><Button onClick={() => setShowForm((v) => !v)}>{showForm ? "Fechar cadastro" : "Criar evento manual"}</Button><Button variant="dark">Atualizar</Button></>}
+        description="Calendário completo de eventos, salas e status. Qualquer usuário pode confirmar, colocar em espera ou cancelar — atualiza para todos automaticamente."
+        actions={<><Button onClick={() => setShowForm((v) => !v)}>{showForm ? "Fechar cadastro" : "Criar evento manual"}</Button><Button variant="dark" onClick={carregarEventos}>Atualizar</Button></>}
       />
 
       <Card className="filters">
         <div className="filter-grid">
-          <Field label="Buscar"><TextInput placeholder="Empresa, sala, evento ou responsável" /></Field>
           <Field label="Status"><SelectInput value={status} onChange={(event) => setStatus(event.target.value)}><option value="todos">Todos</option><option value="confirmado">Confirmados</option><option value="em_espera">Em espera</option><option value="cancelado">Cancelados</option></SelectInput></Field>
           <Field label="Sala"><SelectInput value={room} onChange={(event) => setRoom(event.target.value)}><option value="todas">Todas as salas</option>{rooms.map((item) => <option key={item}>{item}</option>)}</SelectInput></Field>
-          <Field label="Mês"><SelectInput><option>Julho de 2026</option></SelectInput></Field>
-          <Field label="Origem"><SelectInput><option>Todos</option><option>Supera</option><option>Manual</option></SelectInput></Field>
         </div>
         <Button style={{ maxWidth: 760 }} onClick={() => { setStatus("todos"); setRoom("todas"); }}>Limpar filtros</Button>
       </Card>
@@ -107,16 +176,15 @@ export default function AgendaPage() {
 
       <div className="calendar-layout" style={{ marginTop: 22 }}>
         <Card className="calendar-card">
-          <div className="calendar-header"><h2>Julho De 2026</h2><div className="calendar-controls"><Button variant="ghost">‹</Button><Button variant="dark">Hoje</Button><Button variant="ghost">›</Button></div></div>
+          <div className="calendar-header"><h2>{monthNames[month]} de {year}</h2><div className="calendar-controls"><Button variant="ghost" onClick={irParaMesAnterior}>‹</Button><Button variant="dark" onClick={irParaHoje}>Hoje</Button><Button variant="ghost" onClick={irParaProximoMes}>›</Button></div></div>
           <div className="month-grid">
             {weekdays.map((day) => <div className="weekday" key={day}>{day}</div>)}
-            {days.map((day, index) => {
-              const iso = dayToIso(day, index);
-              const items = filtered.filter((event) => event.date === iso);
+            {monthGrid.map((cell) => {
+              const items = filtered.filter((event) => event.date === cell.iso);
               return (
-                <div className={`day-cell ${iso === selectedDate ? "active" : ""}`} key={`${day}-${index}`} onClick={() => setSelectedDate(iso)}>
-                  <div className="day-number">{day}</div>
-                  {items.slice(0,3).map((event) => <button key={event.id} className={`event-pill ${event.status}`}>{event.startTime} {event.room}</button>)}
+                <div className={`day-cell ${cell.iso === selectedDate ? "active" : ""}`} key={cell.iso} style={{ opacity: cell.inMonth ? 1 : 0.4 }} onClick={() => setSelectedDate(cell.iso)}>
+                  <div className="day-number">{cell.day}</div>
+                  {items.slice(0, 3).map((event) => <button key={event.id} className={`event-pill ${event.status}`} type="button">{event.startTime} {event.room}</button>)}
                   {items.length > 3 && <small>+{items.length - 3} eventos</small>}
                 </div>
               );
@@ -131,6 +199,7 @@ export default function AgendaPage() {
             <MetricCard label="Receita" value={formatCurrency(selectedEvents.reduce((s, e) => s + e.amount, 0))} />
             <MetricCard label="Pendentes" value={selectedEvents.filter((event) => event.status === "em_espera").length} />
           </div>
+          {selectedEvents.length === 0 && <p className="muted" style={{ marginTop: 16 }}>Nenhum evento nesta data.</p>}
           {selectedEvents.map((event) => (
             <article className="event-detail-card" key={event.id}>
               <Badge tone={event.status === "confirmado" ? "green" : event.status === "cancelado" ? "red" : "purple"}>{event.status === "em_espera" ? "EM ESPERA" : event.status.toUpperCase()}</Badge>
@@ -141,7 +210,11 @@ export default function AgendaPage() {
               <p><b>Participantes:</b> {event.participants}</p>
               <p><b>Responsável:</b> {event.responsible}</p>
               <strong>{formatCurrency(event.amount)}</strong>
-              <div className="status-dots"><span className="dot-green" /><span className="dot-purple" /><span className="dot-red" /></div>
+              <div className="action-cell" style={{ marginTop: 10, flexWrap: "wrap" }}>
+                {statusOptions.filter((option) => option.value !== event.status).map((option) => (
+                  <Button key={option.value} variant={option.value === "cancelado" ? "danger" : "dark"} disabled={salvandoStatus === event.id} onClick={() => alterarStatus(event.id, option.value)}>{option.label}</Button>
+                ))}
+              </div>
             </article>
           ))}
         </Card>

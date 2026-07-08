@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { MetricCard } from "@/components/ui/MetricCard";
 import { PageHeader } from "@/components/ui/PageHeader";
-import { BarChart } from "@/components/dashboard/BarChart";
+import { MonthlyRevenueList } from "@/components/dashboard/MonthlyRevenueList";
 import { MiniCalendar } from "@/components/dashboard/MiniCalendar";
 import { TextInput } from "@/components/ui/Form";
 
@@ -115,7 +115,7 @@ export default function DashboardPage() {
       <div className="grid grid-3" style={{ marginTop: 22, alignItems: "stretch" }}>
         <Card className="pad">
           <h2>Receita confirmada por mês</h2>
-          <BarChart data={summary.monthlyRevenue} />
+          <MonthlyRevenueList data={summary.monthlyRevenue} />
         </Card>
         <Card className="pad">
           <h2>Fluxo de Caixa</h2>

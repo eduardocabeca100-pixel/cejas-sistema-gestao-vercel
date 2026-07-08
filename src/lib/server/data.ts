@@ -6,11 +6,13 @@ function emptyDashboard(source = "Supabase Database • nenhum dado importado ai
   return { ...dashboardSeed, source, updatedAt: new Date().toISOString() };
 }
 
-function monthLabel(dateValue?: string | null) {
-  if (!dateValue) return "Sem data";
+function monthKey(dateValue?: string | null) {
+  if (!dateValue) return null;
   const date = new Date(`${dateValue}T00:00:00`);
-  if (Number.isNaN(date.getTime())) return "Sem data";
-  return date.toLocaleDateString("pt-BR", { month: "short", year: "2-digit" }).replace(".", "");
+  if (Number.isNaN(date.getTime())) return null;
+  const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+  const label = date.toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
+  return { key, label: label.charAt(0).toUpperCase() + label.slice(1) };
 }
 
 export async function getDashboardSummary(): Promise<DashboardSummary> {
@@ -36,13 +38,19 @@ export async function getDashboardSummary(): Promise<DashboardSummary> {
   const gratuitiesLoss = (gratuities || []).reduce((sum, item) => sum + Number(item.loss_value || 0), 0);
   const cashBalance = (finance || []).filter((entry) => entry.payment_status === "Pago").reduce((sum, entry) => sum + Number(entry.amount || 0), 0);
 
-  const revenueByMonth = new Map<string, number>();
+  const revenueByMonth = new Map<string, { label: string; value: number }>();
   safeEvents
     .filter((event) => event.status === "confirmado")
     .forEach((event) => {
-      const label = monthLabel(event.date);
-      revenueByMonth.set(label, (revenueByMonth.get(label) || 0) + Number(event.amount || 0));
+      const month = monthKey(event.date);
+      if (!month) return;
+      const current = revenueByMonth.get(month.key);
+      revenueByMonth.set(month.key, { label: month.label, value: (current?.value || 0) + Number(event.amount || 0) });
     });
+
+  const monthlyRevenue = Array.from(revenueByMonth.entries())
+    .sort(([keyA], [keyB]) => keyA.localeCompare(keyB))
+    .map(([, entry]) => ({ month: entry.label, value: entry.value }));
 
   return {
     totalEvents,
@@ -56,7 +64,7 @@ export async function getDashboardSummary(): Promise<DashboardSummary> {
     cashBalance,
     source: "Supabase Database",
     updatedAt: new Date().toISOString(),
-    monthlyRevenue: Array.from(revenueByMonth, ([month, value]) => ({ month, value }))
+    monthlyRevenue
   };
 }
 

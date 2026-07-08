@@ -27,3 +27,24 @@ export async function POST(request: NextRequest) {
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
   return NextResponse.json({ ok: true, event: data });
 }
+
+export async function PATCH(request: NextRequest) {
+  const body = await request.json();
+  if (!body.id) return NextResponse.json({ ok: false, error: "Evento não informado." }, { status: 400 });
+
+  const supabase = createSupabaseAdminClient();
+  if (!supabase) return NextResponse.json({ ok: false, error: "Supabase não configurado." }, { status: 503 });
+
+  const updates: Record<string, unknown> = { updated_at: new Date().toISOString() };
+  if (body.status !== undefined) updates.status = body.status;
+  if (body.date !== undefined) updates.date = body.date;
+  if (body.startTime !== undefined) updates.start_time = body.startTime;
+  if (body.endTime !== undefined) updates.end_time = body.endTime;
+  if (body.title !== undefined) updates.title = body.title;
+  if (body.room !== undefined) updates.room = body.room;
+  if (body.amount !== undefined) updates.amount = body.amount;
+
+  const { data, error } = await supabase.from("events").update(updates).eq("id", body.id).select().single();
+  if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+  return NextResponse.json({ ok: true, event: data });
+}
