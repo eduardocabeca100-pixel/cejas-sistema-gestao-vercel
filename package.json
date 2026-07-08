@@ -13,13 +13,14 @@
     "@supabase/supabase-js": "^2.110.0",
     "bcryptjs": "^3.0.3",
     "next": "latest",
-    "pdf-parse": "latest",
+    "pdf-parse": "^1.1.1",
     "react": "latest",
     "react-dom": "latest"
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",
     "@types/node": "latest",
+    "@types/pdf-parse": "^1.1.5",
     "@types/react": "latest",
     "@types/react-dom": "latest",
     "eslint": "latest",

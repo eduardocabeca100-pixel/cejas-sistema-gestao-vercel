@@ -1,12 +1,11 @@
 export async function tryExtractPdfText(buffer: Buffer): Promise<string> {
   try {
     const mod = (await import("pdf-parse")) as any;
-    const PDFParse = mod.PDFParse;
-    const parser = new PDFParse({ data: buffer });
-    const result = await parser.getText();
-    await parser.destroy();
+    const pdfParse = mod.default || mod;
+    const result = await pdfParse(buffer);
     return result.text || "";
-  } catch {
+  } catch (error) {
+    console.error("Falha ao extrair texto do PDF:", error);
     return "";
   }
 }
@@ -36,7 +35,8 @@ const MONTH_MAP: Record<string, number> = {
 
 const DATE_HEADER_RE = /^(SEGUNDA-FEIRA|TER[ÇC]A-FEIRA|QUARTA-FEIRA|QUINTA-FEIRA|SEXTA-FEIRA|S[ÁA]BADO|DOMINGO),\s*(\d{1,2})\s+DE\s+([A-ZÇÃÁÉÊÍÓÔÕÚ]+)\s+DE\s+(\d{4})/i;
 const ROOM_HEADER_RE = /^(\d{1,2})\s*-\s*(.+)$/;
-const HORARIO_RE = /^Hor[áa]rio\s+(\d{2}:\d{2})\s+At[ée]\s+(\d{2}:\d{2})\s+Dura[çc][ãa]o\s+(\d{2}:\d{2})\s+Servi[çc]os\s+Participantes:\s*(\d+)/i;
+const HORARIO_LABEL_RE = /^Hor[áa]rio$/i;
+const TIME_RE = /^\d{2}:\d{2}$/;
 const COMPANY_RE = /^(.+?)\s*-\s*(N[ÃA]O\s*ASSOCIADA|ASSOCIADA)\s*$/i;
 const TOTAL_RE = /Valor\s+total\s+di[áa]rio\.*:\s*([\d.]+,\d{2})/i;
 const PAGE_BREAK_RE = /^--\s*\d+\s*of\s*\d+\s*--$/i;
@@ -55,6 +55,8 @@ function statusFromWord(word: string): "confirmado" | "em_espera" | "cancelado" 
 /**
  * Parser específico para o relatório "Agendamentos de Salas e Equipamentos" do Supera.
  * Formato: blocos de data > sala > horário, um evento por bloco, sem seção de totais.
+ * O pdf-parse (v1, sem dependência nativa) extrai cada rótulo/valor do bloco "Horário"
+ * em uma linha separada, por isso os campos são lidos por deslocamento fixo (i+1..i+7).
  * Testado contra um export real de 50 páginas / 306 eventos antes de ir pra produção.
  */
 export function parseAgendamentosSalas(rawText: string): { events: ParsedAgendaEvent[]; warnings: string[] } {
@@ -82,12 +84,17 @@ export function parseAgendamentosSalas(rawText: string): { events: ParsedAgendaE
       continue;
     }
 
-    const horarioMatch = line.match(HORARIO_RE);
-    if (horarioMatch) {
+    if (HORARIO_LABEL_RE.test(line)) {
+      const startTime = lines[i + 1];
+      const endTime = lines[i + 3];
+      const participantsStr = lines[i + 7];
+      if (!TIME_RE.test(startTime) || !TIME_RE.test(endTime)) {
+        warnings.push(`Bloco "Horário" com formato inesperado (linha ${i})`);
+        continue;
+      }
       if (!currentDateIso) { warnings.push(`Horário sem data (linha ${i})`); continue; }
-      const [, startTime, endTime, , participantsStr] = horarioMatch;
 
-      let j = i + 1;
+      let j = i + 8;
       const titleLines: string[] = [];
       let company = "";
       let customerType: "associado" | "nao_associado" = "associado";
