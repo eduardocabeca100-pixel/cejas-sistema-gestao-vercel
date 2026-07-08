@@ -1563,7 +1563,7 @@ ${area.innerHTML}
                           Atenciosamente,<br />
                           <strong>{emissor || "EDUARDO"}</strong>
                           Cel: (47) 98835-7184<br />
-                          E-mail: comercial@cejas.com.br
+                          E-mail: {currentUser?.email || "comercial@cejas.com.br"}
                         </div>
 
                         <div className="cejas-system-mark">Sistema Comercial CEJAS v2026</div>
