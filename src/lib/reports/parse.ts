@@ -1,13 +1,8 @@
 export async function tryExtractPdfText(buffer: Buffer): Promise<string> {
-  try {
-    const mod = (await import("pdf-parse")) as any;
-    const pdfParse = mod.default || mod;
-    const result = await pdfParse(buffer);
-    return result.text || "";
-  } catch (error) {
-    console.error("Falha ao extrair texto do PDF:", error);
-    return "";
-  }
+  const mod = (await import("pdf-parse")) as any;
+  const pdfParse = mod.default || mod;
+  const result = await pdfParse(buffer);
+  return result.text || "";
 }
 
 export interface ParsedAgendaEvent {
