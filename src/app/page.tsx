@@ -46,7 +46,11 @@ export default function LoginPage() {
       <section className="login-shell">
         <div className="login-brand">
           <div className="login-logo-card"><strong>CEJAS</strong><span>Centro Empresarial de Jaraguá do Sul</span></div>
-          <p>S I S T E M A &nbsp; I N T E R N O</p>
+          <div className="login-brand-mid">
+            <h2>Sistema de Gestão CEJAS</h2>
+            <p>Agenda, orçamentos, financeiro, contratos e arquivos do CEJAS em um só lugar, com dados salvos direto no banco.</p>
+          </div>
+          <p className="login-tag">S I S T E M A &nbsp; I N T E R N O</p>
         </div>
         <form className="login-panel" onSubmit={handleSubmit}>
           <h1>Entrar</h1>

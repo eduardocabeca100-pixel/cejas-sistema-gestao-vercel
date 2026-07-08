@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { MetricCard } from "@/components/ui/MetricCard";
 import { PageHeader } from "@/components/ui/PageHeader";
-import { createBrowserSupabaseClient } from "@/lib/supabase/client";
 
 export default function ImportarRelatorioPage() {
   const [summary, setSummary] = useState(dashboardSeed);
@@ -35,13 +34,21 @@ export default function ImportarRelatorioPage() {
       const signJson = await signResponse.json();
       if (!signJson.ok) throw new Error(signJson.error || "Não foi possível iniciar o upload.");
 
-      const supabase = createBrowserSupabaseClient();
-      if (!supabase) throw new Error("Supabase não configurado no navegador (NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_ANON_KEY).");
+      const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+      if (!anonKey) throw new Error("NEXT_PUBLIC_SUPABASE_ANON_KEY não configurada na Vercel. Adicione essa variável de ambiente e faça um novo deploy.");
 
       setStatus("Enviando PDF para o Supabase Storage...");
-      const bucket = "servidor-cejas";
-      const { error: uploadError } = await supabase.storage.from(bucket).uploadToSignedUrl(signJson.path, signJson.token, file);
-      if (uploadError) throw new Error(uploadError.message);
+      const putResponse = await fetch(signJson.signedUrl, {
+        method: "PUT",
+        headers: {
+          apikey: anonKey,
+          Authorization: `Bearer ${anonKey}`,
+          "content-type": file.type || "application/pdf",
+          "x-upsert": "true"
+        },
+        body: file
+      });
+      if (!putResponse.ok) throw new Error(`Falha ao enviar o arquivo para o Storage (HTTP ${putResponse.status}).`);
 
       setStatus("Lendo o PDF e calculando o resumo...");
       const finalizeResponse = await fetch("/api/import-report/finalize", {

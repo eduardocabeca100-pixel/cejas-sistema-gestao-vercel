@@ -13,5 +13,5 @@ export async function POST(request: NextRequest) {
   const { data, error } = await supabase.storage.from(getStorageBucket()).createSignedUploadUrl(storagePath);
   if (error || !data) return NextResponse.json({ ok: false, error: error?.message || "Não foi possível gerar o link de upload." }, { status: 500 });
 
-  return NextResponse.json({ ok: true, path: data.path, token: data.token });
+  return NextResponse.json({ ok: true, path: data.path, token: data.token, signedUrl: data.signedUrl });
 }
