@@ -734,10 +734,10 @@ function statusClass(status: string | null) {
 }
 
 function pastaKey(arquivo: ArquivoServidor) {
-  const ano = arquivo.ano || "_VERIFICAR";
-  const mes = arquivo.mes || "arquivos sem data";
-  const evento = arquivo.evento || "arquivos sem evento";
-  return `${ano} / ${mes} / ${evento}`;
+  if (arquivo.status_classificacao && arquivo.status_classificacao !== "classificado") {
+    return `VERIFICAR / ${arquivo.mes || "SEM MÊS"}`;
+  }
+  return `${arquivo.ano} / ${arquivo.mes} / ${arquivo.evento}`;
 }
 
 export default function ServidorPage() {
@@ -943,6 +943,36 @@ export default function ServidorPage() {
       if (enviados > 0) setMensagem(`${enviados} de ${total} arquivo(s) enviado(s) com sucesso.`);
     }
 
+    await carregarArquivos();
+  }
+
+  async function moverArquivo(arquivo: ArquivoServidor) {
+    const ano = window.prompt("Ano da pasta (ex: 2026):", arquivo.ano || anoAtual());
+    if (!ano) return;
+
+    const mes = window.prompt(
+      `Mês da pasta, use um destes valores:\n${MESES_CEJAS.join(", ")}`,
+      arquivo.mes || "01 JANEIRO"
+    );
+    if (!mes) return;
+
+    const evento = window.prompt("Nome do evento/pasta (ex: WEG 23.01):", arquivo.evento || "");
+    if (!evento) return;
+
+    const response = await fetch("/api/servidor/arquivos", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: arquivo.id, ano, mes, evento })
+    });
+
+    const data = await response.json();
+
+    if (!response.ok || !data.ok) {
+      setErro(data.erro || "Falha ao mover arquivo.");
+      return;
+    }
+
+    setMensagem(`Arquivo movido para ${ano} / ${mes} / ${evento.toUpperCase()}.`);
     await carregarArquivos();
   }
 
@@ -1215,6 +1245,7 @@ export default function ServidorPage() {
                         </div>
                       </div>
                       <div className="cejas-file-actions">
+                        <button className="cejas-mini blue" type="button" onClick={() => moverArquivo(arquivo)}>Mover para pasta</button>
                         <button className="cejas-mini red" type="button" onClick={() => excluirArquivo(arquivo.id)}>Excluir</button>
                       </div>
                     </div>
@@ -1292,7 +1323,7 @@ export default function ServidorPage() {
                               Renomear
                             </button>
 
-                            <button className="cejas-mini" type="button" onClick={() => alert("Mover entra na próxima etapa.")}>
+                            <button className="cejas-mini" type="button" onClick={() => moverArquivo(arquivo)}>
                               Mover
                             </button>
 
