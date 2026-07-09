@@ -25,6 +25,13 @@ type ArquivoServidor = {
   signed_download_url: string | null;
 };
 
+type ArvoreNode = {
+  nome: string;
+  caminho: string;
+  filhos: Map<string, ArvoreNode>;
+  ehFolha: boolean;
+};
+
 const MESES_CEJAS = [
   "01 JANEIRO",
   "02 FEVEREIRO",
@@ -390,35 +397,6 @@ const css = `
   color: #fecaca;
 }
 
-.cejas-verificar {
-  border: 1px solid rgba(255,255,255,.08);
-  background: #0c0d12;
-  border-radius: 18px;
-  padding: 16px;
-  margin-bottom: 18px;
-}
-
-.cejas-verificar-head {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  align-items: center;
-  margin-bottom: 8px;
-}
-
-.cejas-verificar h3 {
-  margin: 0;
-  text-transform: uppercase;
-  letter-spacing: .16em;
-  font-size: 14px;
-}
-
-.cejas-verificar p {
-  margin: 0 0 12px;
-  color: #a1a1aa;
-  font-size: 13px;
-}
-
 .cejas-empty {
   border: 1px dashed rgba(255,255,255,.11);
   border-radius: 14px;
@@ -426,68 +404,6 @@ const css = `
   color: #a1a1aa;
   text-align: center;
   font-size: 13px;
-}
-
-.cejas-folder-list {
-  display: grid;
-  gap: 12px;
-}
-
-.cejas-folder {
-  border: 1px solid rgba(255,255,255,.08);
-  background: #0c0d12;
-  border-radius: 18px;
-  overflow: hidden;
-}
-
-.cejas-folder-title {
-  display: flex;
-  justify-content: space-between;
-  gap: 14px;
-  padding: 14px 16px;
-  background: rgba(255,255,255,.035);
-  border-bottom: 1px solid rgba(255,255,255,.07);
-}
-
-.cejas-folder-title strong {
-  color: #fff;
-  font-size: 14px;
-}
-
-.cejas-folder-title span {
-  color: #a1a1aa;
-  font-size: 12px;
-}
-
-.cejas-file-list {
-  display: grid;
-}
-
-.cejas-file {
-  display: grid;
-  grid-template-columns: minmax(0,1fr) auto;
-  gap: 14px;
-  padding: 14px 16px;
-  border-bottom: 1px solid rgba(255,255,255,.06);
-}
-
-.cejas-file:last-child {
-  border-bottom: 0;
-}
-
-.cejas-file h4 {
-  margin: 0 0 8px;
-  color: #fff;
-  font-size: 14px;
-  word-break: break-word;
-}
-
-.cejas-meta {
-  display: flex;
-  gap: 7px;
-  flex-wrap: wrap;
-  color: #a1a1aa;
-  font-size: 12px;
 }
 
 .cejas-tag {
@@ -516,11 +432,12 @@ const css = `
   color: #fca5a5;
 }
 
-.cejas-path {
-  margin-top: 8px;
-  color: #64748b;
-  font-size: 11px;
-  word-break: break-all;
+.cejas-meta {
+  display: flex;
+  gap: 7px;
+  flex-wrap: wrap;
+  color: #a1a1aa;
+  font-size: 12px;
 }
 
 .cejas-file-actions {
@@ -550,140 +467,115 @@ const css = `
   background: #ef4444;
 }
 
-
-.cejas-folder-list {
+.cejas-explorer {
   display: grid;
-  gap: 14px;
+  grid-template-columns: 300px minmax(0,1fr);
+  border-top: 1px solid rgba(255,255,255,.08);
 }
 
-.cejas-folder {
-  border: 1px solid rgba(255,255,255,.08);
-  background: #0c0d12;
-  border-radius: 18px;
-  overflow: hidden;
+.cejas-tree {
+  border-right: 1px solid rgba(255,255,255,.08);
+  padding: 14px 8px;
+  overflow-y: auto;
+  max-height: 760px;
 }
 
-.cejas-folder-title {
-  display: flex;
-  justify-content: space-between;
-  gap: 14px;
-  padding: 14px 16px;
-  background: rgba(255,255,255,.045);
-  border-bottom: 1px solid rgba(255,255,255,.07);
-  cursor: pointer;
-  list-style: none;
-}
-
-.cejas-folder-title::-webkit-details-marker {
-  display: none;
-}
-
-.cejas-folder-title::before {
-  content: "▾";
-  color: #a78bfa;
-  font-weight: 900;
-  margin-right: 4px;
-}
-
-.cejas-folder:not([open]) .cejas-folder-title::before {
-  content: "▸";
-}
-
-.cejas-folder-path {
-  display: grid;
-  gap: 5px;
-  min-width: 0;
-}
-
-.cejas-folder-level {
+.cejas-tree-item {
   display: flex;
   align-items: center;
   gap: 7px;
-  min-width: 0;
-}
-
-.cejas-folder-level strong {
-  color: #ffffff;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: #d4d4d8;
+  text-align: left;
+  padding: 8px 10px;
+  border-radius: 9px;
   font-size: 13px;
-  line-height: 1.2;
-  word-break: break-word;
+  font-weight: 800;
+  cursor: pointer;
 }
 
-.cejas-folder-level.level-0 strong {
-  color: #ffffff;
-  font-size: 14px;
+.cejas-tree-item:hover {
+  background: rgba(255,255,255,.05);
 }
 
-.cejas-folder-level.level-1 {
-  padding-left: 20px;
+.cejas-tree-item.active {
+  background: linear-gradient(135deg, rgba(123,97,255,.4), rgba(255,97,210,.22));
+  color: #fff;
 }
 
-.cejas-folder-level.level-2 {
-  padding-left: 44px;
-}
-
-.cejas-folder-level.level-2 strong {
-  color: #c4b5fd;
-}
-
-.cejas-folder-prefix {
+.cejas-tree-arrow {
+  width: 12px;
+  flex: 0 0 auto;
   color: #a78bfa;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  white-space: pre;
+  font-size: 10px;
 }
 
-.cejas-folder-count {
-  margin-left: 44px;
-  width: max-content;
-  display: inline-flex;
-  align-items: center;
-  border-radius: 999px;
-  padding: 4px 8px;
-  background: rgba(59,130,246,.14);
-  color: #bfdbfe;
+.cejas-tree-icon {
+  flex: 0 0 auto;
+}
+
+.cejas-tree-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cejas-tree-count {
+  margin-left: auto;
+  flex: 0 0 auto;
+  color: #71717a;
   font-size: 11px;
   font-weight: 900;
 }
 
-.cejas-folder-size {
-  color: #94a3b8;
+.cejas-tree-empty {
+  color: #71717a;
+  font-size: 13px;
+  padding: 14px 10px;
+}
+
+.cejas-files-panel {
+  padding: 20px;
+  overflow-y: auto;
+  max-height: 760px;
+  min-width: 0;
+}
+
+.cejas-breadcrumb {
+  color: #a78bfa;
+  font-weight: 900;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  margin: 0 0 4px;
+  word-break: break-word;
+}
+
+.cejas-files-count {
+  color: #71717a;
   font-size: 12px;
-  white-space: nowrap;
+  margin-bottom: 18px;
 }
 
-.cejas-file-list {
-  display: grid;
-  background: rgba(0,0,0,.12);
-}
-
-.cejas-file {
+.cejas-file-row {
   display: grid;
   grid-template-columns: minmax(0,1fr) auto;
   gap: 14px;
-  padding: 14px 16px 14px 56px;
+  padding: 14px 0;
   border-bottom: 1px solid rgba(255,255,255,.06);
-  position: relative;
 }
 
-.cejas-file::before {
-  content: "";
-  position: absolute;
-  left: 34px;
-  top: 0;
-  bottom: 0;
-  border-left: 1px dashed rgba(167,139,250,.25);
+.cejas-file-row:last-child {
+  border-bottom: 0;
 }
 
-.cejas-file h4 {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.cejas-file-prefix {
-  color: #a78bfa;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  white-space: nowrap;
+.cejas-file-row h4 {
+  margin: 0 0 8px;
+  color: #fff;
+  font-size: 14px;
+  word-break: break-word;
 }
 
 @media (max-width: 1180px) {
@@ -701,6 +593,16 @@ const css = `
 
   .cejas-search-wrap {
     min-width: 0;
+  }
+
+  .cejas-explorer {
+    grid-template-columns: 1fr;
+  }
+
+  .cejas-tree {
+    max-height: 320px;
+    border-right: 0;
+    border-bottom: 1px solid rgba(255,255,255,.08);
   }
 }
 `;
@@ -740,6 +642,105 @@ function pastaKey(arquivo: ArquivoServidor) {
   return `${arquivo.ano} / ${arquivo.mes} / ${arquivo.evento}`;
 }
 
+function construirArvore(grupos: Array<[string, ArquivoServidor[]]>): ArvoreNode {
+  const raiz: ArvoreNode = { nome: "", caminho: "", filhos: new Map(), ehFolha: false };
+
+  grupos.forEach(([pasta]) => {
+    const partes = pasta.split(" / ");
+    let atual = raiz;
+    let caminhoAcumulado = "";
+
+    partes.forEach((parte) => {
+      caminhoAcumulado = caminhoAcumulado ? `${caminhoAcumulado} / ${parte}` : parte;
+      if (!atual.filhos.has(parte)) {
+        atual.filhos.set(parte, { nome: parte, caminho: caminhoAcumulado, filhos: new Map(), ehFolha: false });
+      }
+      atual = atual.filhos.get(parte) as ArvoreNode;
+    });
+
+    atual.ehFolha = true;
+  });
+
+  return raiz;
+}
+
+function ordenarFilhos(node: ArvoreNode, raiz: boolean): ArvoreNode[] {
+  const filhos = Array.from(node.filhos.values());
+  return filhos.sort((a, b) => {
+    if (raiz) {
+      if (a.nome === "VERIFICAR") return 1;
+      if (b.nome === "VERIFICAR") return -1;
+    }
+    if (a.nome === "SEM MÊS") return 1;
+    if (b.nome === "SEM MÊS") return -1;
+    return a.nome.localeCompare(b.nome, "pt-BR");
+  });
+}
+
+function ArvoreView({
+  node,
+  raiz,
+  depth,
+  expandidos,
+  onToggle,
+  selecionado,
+  onSelecionar,
+  contagem
+}: {
+  node: ArvoreNode;
+  raiz: boolean;
+  depth: number;
+  expandidos: Set<string>;
+  onToggle: (caminho: string) => void;
+  selecionado: string | null;
+  onSelecionar: (caminho: string) => void;
+  contagem: Map<string, number>;
+}) {
+  const filhos = ordenarFilhos(node, raiz);
+
+  return (
+    <>
+      {filhos.map((filho) => {
+        const temFilhos = filho.filhos.size > 0;
+        const aberto = expandidos.has(filho.caminho);
+        const ativo = filho.caminho === selecionado;
+
+        return (
+          <div key={filho.caminho}>
+            <button
+              type="button"
+              className={`cejas-tree-item ${ativo ? "active" : ""}`}
+              style={{ paddingLeft: 10 + depth * 16 }}
+              onClick={() => {
+                if (temFilhos) onToggle(filho.caminho);
+                if (filho.ehFolha) onSelecionar(filho.caminho);
+              }}
+            >
+              {temFilhos ? <span className="cejas-tree-arrow">{aberto ? "▾" : "▸"}</span> : <span className="cejas-tree-arrow" />}
+              <span className="cejas-tree-icon">📁</span>
+              <span className="cejas-tree-label">{filho.nome}</span>
+              {filho.ehFolha && <span className="cejas-tree-count">{contagem.get(filho.caminho) || 0}</span>}
+            </button>
+
+            {temFilhos && aberto && (
+              <ArvoreView
+                node={filho}
+                raiz={false}
+                depth={depth + 1}
+                expandidos={expandidos}
+                onToggle={onToggle}
+                selecionado={selecionado}
+                onSelecionar={onSelecionar}
+                contagem={contagem}
+              />
+            )}
+          </div>
+        );
+      })}
+    </>
+  );
+}
+
 export default function ServidorPage() {
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [arquivos, setArquivos] = useState<ArquivoServidor[]>([]);
@@ -755,6 +756,9 @@ export default function ServidorPage() {
   const [erro, setErro] = useState("");
   const [carregando, setCarregando] = useState(false);
   const [enviando, setEnviando] = useState(false);
+  const [expandidos, setExpandidos] = useState<Set<string>>(new Set());
+  const [pastaSelecionada, setPastaSelecionada] = useState<string | null>(null);
+  const jaExpandiuRaizes = useRef(false);
 
   const carregarArquivos = useCallback(async () => {
     setCarregando(true);
@@ -791,16 +795,8 @@ export default function ServidorPage() {
     carregarArquivos();
   }, [carregarArquivos]);
 
-  const verificar = useMemo(() => {
-    return arquivos.filter((arquivo) => arquivo.status_classificacao && arquivo.status_classificacao !== "classificado");
-  }, [arquivos]);
-
   const totalBytes = useMemo(() => {
     return arquivos.reduce((acc, arquivo) => acc + Number(arquivo.tamanho || 0), 0);
-  }, [arquivos]);
-
-  const pastas = useMemo(() => {
-    return new Set(arquivos.map((arquivo) => pastaKey(arquivo))).size;
   }, [arquivos]);
 
   const grupos = useMemo(() => {
@@ -814,6 +810,33 @@ export default function ServidorPage() {
 
     return Array.from(mapa.entries()).sort((a, b) => a[0].localeCompare(b[0]));
   }, [arquivos]);
+
+  const mapaPorPasta = useMemo(() => new Map(grupos), [grupos]);
+  const contagem = useMemo(() => new Map(grupos.map(([pasta, itens]) => [pasta, itens.length])), [grupos]);
+  const arvore = useMemo(() => construirArvore(grupos), [grupos]);
+
+  useEffect(() => {
+    if (jaExpandiuRaizes.current || arvore.filhos.size === 0) return;
+    jaExpandiuRaizes.current = true;
+    setExpandidos(new Set(Array.from(arvore.filhos.values()).map((n) => n.caminho)));
+  }, [arvore]);
+
+  useEffect(() => {
+    if (pastaSelecionada && !mapaPorPasta.has(pastaSelecionada)) {
+      setPastaSelecionada(null);
+    }
+  }, [pastaSelecionada, mapaPorPasta]);
+
+  const arquivosDaPastaSelecionada = pastaSelecionada ? mapaPorPasta.get(pastaSelecionada) || [] : [];
+
+  function alternarExpandido(caminho: string) {
+    setExpandidos((prev) => {
+      const proximo = new Set(prev);
+      if (proximo.has(caminho)) proximo.delete(caminho);
+      else proximo.add(caminho);
+      return proximo;
+    });
+  }
 
   function abrirSeletor(modoSelecao: "arquivo" | "pasta" | "zip") {
     const input = inputRef.current;
@@ -1023,6 +1046,7 @@ export default function ServidorPage() {
     }
 
     setMensagem(`Limpeza concluída. ${data.removidos || 0} arquivo(s) removido(s).`);
+    setPastaSelecionada(null);
     await carregarArquivos();
   }
 
@@ -1059,7 +1083,7 @@ export default function ServidorPage() {
               <h2>Subir arquivos e pastas</h2>
               <p>
                 Envie vários arquivos soltos, uma pasta completa ou arraste várias pastas/arquivos ao mesmo tempo.
-                No modo inteligente, cada arquivo vira uma pasta própria quando o sistema entende evento e data.
+                No modo inteligente, arquivos do mesmo evento (orçamento, contrato, boleto, demonstrativo...) caem juntos na mesma pasta.
               </p>
 
               <div className="cejas-upload-actions">
@@ -1088,8 +1112,8 @@ export default function ServidorPage() {
             <label className={`cejas-radio-card ${modo === "inteligente" ? "active" : ""}`}>
               <input type="radio" checked={modo === "inteligente"} onChange={() => setModo("inteligente")} />
               <span>
-                <strong>Organizar automaticamente por entidade, mês, tipo e data</strong>
-                <span>Recomendado. O sistema identifica boleto, contrato, orçamento, demonstrativo, evento e data.</span>
+                <strong>Organizar automaticamente por evento, mês e data</strong>
+                <span>Recomendado. O sistema identifica tipo (boleto, contrato, orçamento, demonstrativo...), evento e data, e agrupa tudo do mesmo evento numa pasta só.</span>
               </span>
             </label>
 
@@ -1165,9 +1189,9 @@ export default function ServidorPage() {
 
           <div className="cejas-panel">
             <div className="cejas-info-card">
-              <strong>Como o modo inteligente organiza</strong>
-              Exemplo de entidade: 2026 / 01 JANEIRO / ENTIDADES / CDL / 02 BOLETOS ENTIDADES / 15.01 - CAFÉ / boleto.pdf.
-              Arquivos que o sistema não entender entram em VERIFICAR.
+              <strong>Regra principal: Ano &gt; Mês &gt; Evento &gt; Arquivos</strong>
+              Tudo do mesmo evento (orçamento, contrato, boleto, demonstrativo) fica dentro da pasta do próprio evento.
+              Ex: 2026 / 06 JUNHO / APRESENTAÇÃO DE RESULTADOS CLINICORP 06.06 / boleto.pdf. Arquivos que o sistema não entender entram em VERIFICAR.
             </div>
 
             <div className="cejas-info-card">
@@ -1181,7 +1205,7 @@ export default function ServidorPage() {
           <div className="cejas-main-head">
             <div>
               <h2>Arquivos salvos</h2>
-              <p>Clique em uma pasta para abrir. Clique em um arquivo para visualizar.</p>
+              <p>Clique numa pasta à esquerda para ver os arquivos dela.</p>
             </div>
 
             <div className="cejas-search-wrap">
@@ -1209,7 +1233,7 @@ export default function ServidorPage() {
             <div className="cejas-metrics">
               <div className="cejas-metric">
                 <span>Pastas</span>
-                <strong>{pastas}</strong>
+                <strong>{grupos.length}</strong>
               </div>
 
               <div className="cejas-metric">
@@ -1222,123 +1246,95 @@ export default function ServidorPage() {
                 <strong>{totalMB(totalBytes)}</strong>
               </div>
             </div>
-
-            <section className="cejas-verificar">
-              <div className="cejas-verificar-head">
-                <h3>Verificar</h3>
-                <button className="cejas-btn" type="button" onClick={carregarArquivos}>Atualizar verificar</button>
-              </div>
-
-              <p>Arquivos que o sistema não entendeu. Você pode apagar ou mover para uma pasta de evento já criada.</p>
-
-              {verificar.length === 0 ? (
-                <div className="cejas-empty">Nenhum arquivo pendente em VERIFICAR.</div>
-              ) : (
-                <div className="cejas-file-list">
-                  {verificar.slice(0, 5).map((arquivo) => (
-                    <div className="cejas-file" key={arquivo.id}>
-                      <div>
-                        <h4><span className="cejas-file-prefix">└── 📄</span>{arquivo.nome}</h4>
-                        <div className="cejas-meta">
-                          <span className={statusClass(arquivo.status_classificacao)}>{arquivo.status_classificacao}</span>
-                          <span>{arquivo.caminho_storage}</span>
-                        </div>
-                      </div>
-                      <div className="cejas-file-actions">
-                        <button className="cejas-mini blue" type="button" onClick={() => moverArquivo(arquivo)}>Mover para pasta</button>
-                        <button className="cejas-mini red" type="button" onClick={() => excluirArquivo(arquivo.id)}>Excluir</button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </section>
-
-            {carregando ? (
-              <div className="cejas-empty">Carregando servidor...</div>
-            ) : arquivos.length === 0 ? (
-              <div className="cejas-empty">Nenhum arquivo salvo no servidor ainda.</div>
-            ) : (
-              <div className="cejas-folder-list">
-                {grupos.map(([pasta, arquivosDaPasta]) => (
-                  <details className="cejas-folder" key={pasta} open>
-                    <summary className="cejas-folder-title">
-                      <div className="cejas-folder-path">
-                        {pasta.split(" / ").map((parte, index) => (
-                          <div key={`${pasta}-${parte}-${index}`} className={`cejas-folder-level level-${index}`}>
-                            <span className="cejas-folder-prefix">
-                              {index === 0 ? "📁" : index === 1 ? "└── 📁" : "    └── 📁"}
-                            </span>
-                            <strong>{parte}</strong>
-                          </div>
-                        ))}
-
-                        <span className="cejas-folder-count">{arquivosDaPasta.length} arquivo(s)</span>
-                      </div>
-
-                      <span className="cejas-folder-size">
-                        {formatarTamanho(arquivosDaPasta.reduce((acc, item) => acc + Number(item.tamanho || 0), 0))}
-                      </span>
-                    </summary>
-
-                    <div className="cejas-file-list">
-                      {arquivosDaPasta.map((arquivo) => (
-                        <article className="cejas-file" key={arquivo.id}>
-                          <div>
-                            <h4><span className="cejas-file-prefix">└── 📄</span>{arquivo.nome}</h4>
-
-                            <div className="cejas-meta">
-                              <span className="cejas-tag">{arquivo.tipo_identificado}</span>
-                              <span className={statusClass(arquivo.status_classificacao)}>
-                                {arquivo.status_classificacao || "classificado"}
-                              </span>
-                              <span>{formatarDataEvento(arquivo.data_evento)}</span>
-                              <span>{formatarTamanho(arquivo.tamanho)}</span>
-                              <span>{arquivo.usuario_nome || "Sistema"}</span>
-                            </div>
-
-                            <div className="cejas-path">Storage: {arquivo.caminho_storage}</div>
-                          </div>
-
-                          <div className="cejas-file-actions">
-                            <button
-                              className="cejas-mini blue"
-                              type="button"
-                              disabled={!arquivo.signed_url}
-                              onClick={() => arquivo.signed_url && window.open(arquivo.signed_url, "_blank")}
-                            >
-                              Visualizar
-                            </button>
-
-                            <button
-                              className="cejas-mini"
-                              type="button"
-                              disabled={!arquivo.signed_download_url}
-                              onClick={() => arquivo.signed_download_url && window.open(arquivo.signed_download_url, "_blank")}
-                            >
-                              Baixar
-                            </button>
-
-                            <button className="cejas-mini" type="button" onClick={() => alert("Renomear entra na próxima etapa.")}>
-                              Renomear
-                            </button>
-
-                            <button className="cejas-mini" type="button" onClick={() => moverArquivo(arquivo)}>
-                              Mover
-                            </button>
-
-                            <button className="cejas-mini red" type="button" onClick={() => excluirArquivo(arquivo.id)}>
-                              Excluir
-                            </button>
-                          </div>
-                        </article>
-                      ))}
-                    </div>
-                  </details>
-                ))}
-              </div>
-            )}
           </div>
+
+          {carregando ? (
+            <div className="cejas-empty" style={{ margin: 20 }}>Carregando servidor...</div>
+          ) : arquivos.length === 0 ? (
+            <div className="cejas-empty" style={{ margin: 20 }}>Nenhum arquivo salvo no servidor ainda.</div>
+          ) : (
+            <div className="cejas-explorer">
+              <nav className="cejas-tree">
+                {arvore.filhos.size === 0 ? (
+                  <div className="cejas-tree-empty">Nenhuma pasta encontrada.</div>
+                ) : (
+                  <ArvoreView
+                    node={arvore}
+                    raiz
+                    depth={0}
+                    expandidos={expandidos}
+                    onToggle={alternarExpandido}
+                    selecionado={pastaSelecionada}
+                    onSelecionar={setPastaSelecionada}
+                    contagem={contagem}
+                  />
+                )}
+              </nav>
+
+              <div className="cejas-files-panel">
+                {!pastaSelecionada ? (
+                  <div className="cejas-empty">Selecione uma pasta à esquerda para ver os arquivos.</div>
+                ) : (
+                  <>
+                    <p className="cejas-breadcrumb">{pastaSelecionada.replace(/ \/ /g, " › ")}</p>
+                    <p className="cejas-files-count">{arquivosDaPastaSelecionada.length} arquivo(s)</p>
+
+                    {arquivosDaPastaSelecionada.map((arquivo) => (
+                      <article className="cejas-file-row" key={arquivo.id}>
+                        <div>
+                          <h4>📄 {arquivo.nome}</h4>
+
+                          <div className="cejas-meta">
+                            <span className="cejas-tag">{arquivo.tipo_identificado}</span>
+                            {arquivo.status_classificacao !== "classificado" && (
+                              <span className={statusClass(arquivo.status_classificacao)}>
+                                {arquivo.status_classificacao}
+                              </span>
+                            )}
+                            <span>{formatarDataEvento(arquivo.data_evento)}</span>
+                            <span>{formatarTamanho(arquivo.tamanho)}</span>
+                            <span>{arquivo.usuario_nome || "Sistema"}</span>
+                          </div>
+                        </div>
+
+                        <div className="cejas-file-actions">
+                          <button
+                            className="cejas-mini blue"
+                            type="button"
+                            disabled={!arquivo.signed_url}
+                            onClick={() => arquivo.signed_url && window.open(arquivo.signed_url, "_blank")}
+                          >
+                            Visualizar
+                          </button>
+
+                          <button
+                            className="cejas-mini"
+                            type="button"
+                            disabled={!arquivo.signed_download_url}
+                            onClick={() => arquivo.signed_download_url && window.open(arquivo.signed_download_url, "_blank")}
+                          >
+                            Baixar
+                          </button>
+
+                          <button className="cejas-mini" type="button" onClick={() => alert("Renomear entra na próxima etapa.")}>
+                            Renomear
+                          </button>
+
+                          <button className="cejas-mini" type="button" onClick={() => moverArquivo(arquivo)}>
+                            Mover
+                          </button>
+
+                          <button className="cejas-mini red" type="button" onClick={() => excluirArquivo(arquivo.id)}>
+                            Excluir
+                          </button>
+                        </div>
+                      </article>
+                    ))}
+                  </>
+                )}
+              </div>
+            </div>
+          )}
         </main>
       </section>
     </div>
