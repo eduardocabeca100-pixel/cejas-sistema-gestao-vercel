@@ -852,53 +852,98 @@ export default function ServidorPage() {
       return;
     }
 
+    const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    if (!anonKey) {
+      setErro("NEXT_PUBLIC_SUPABASE_ANON_KEY não configurada na Vercel. Adicione essa variável de ambiente e faça um novo deploy.");
+      return;
+    }
+
     setEnviando(true);
     setErro("");
-    setMensagem(`Enviando ${selecionados.length} arquivo(s) para o Supabase...`);
 
-    try {
-      for (const file of selecionados) {
-        const formData = new FormData();
-        formData.append("file", file);
+    const total = selecionados.length;
+    let enviados = 0;
+    let ignorados = 0;
+    const falhas: string[] = [];
 
-        const relativePath =
-          (file as File & { webkitRelativePath?: string }).webkitRelativePath || file.name;
+    for (const file of selecionados) {
+      const relativePath =
+        (file as File & { webkitRelativePath?: string }).webkitRelativePath || file.name;
 
-        formData.append("relativePath", relativePath);
-        formData.append("ano", anoPadrao);
-        formData.append("mes", modo === "manual" ? mesManual : "");
-        formData.append("evento", modo === "manual" ? eventoManual.toUpperCase() : "");
-        formData.append("usuarioNome", "Eduardo");
-        formData.append("modoOrganizacao", modo);
-        formData.append("duplicateMode", modoDuplicado);
+      setMensagem(`Enviando ${enviados + 1} de ${total}: ${file.name}...`);
 
-        const response = await fetch("/api/servidor/arquivos", {
+      try {
+        const signResponse = await fetch("/api/servidor/arquivos/sign", {
           method: "POST",
-          body: formData
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            fileName: file.name,
+            relativePath,
+            ano: anoPadrao,
+            mes: modo === "manual" ? mesManual : "",
+            evento: modo === "manual" ? eventoManual.toUpperCase() : "",
+            modoOrganizacao: modo,
+            duplicateMode: modoDuplicado
+          })
         });
 
-        const contentType = response.headers.get("content-type") || "";
+        const signJson = await signResponse.json();
+        if (!signJson.ok) throw new Error(signJson.erro || `Falha ao preparar envio de ${file.name}`);
 
-        if (!contentType.includes("application/json")) {
-          const texto = await response.text();
-          throw new Error(`API retornou resposta inválida ao enviar ${file.name}. Status ${response.status}. ${texto.slice(0, 80)}`);
+        if (signJson.skip) {
+          ignorados += 1;
+          enviados += 1;
+          continue;
         }
 
-        const data = await response.json();
+        const putResponse = await fetch(signJson.signedUrl, {
+          method: "PUT",
+          headers: {
+            apikey: anonKey,
+            Authorization: `Bearer ${anonKey}`,
+            "content-type": file.type || "application/octet-stream",
+            "x-upsert": "true"
+          },
+          body: file
+        });
 
-        if (!response.ok || !data.ok) {
-          throw new Error(data.erro || `Falha ao enviar ${file.name}`);
-        }
+        if (!putResponse.ok) throw new Error(`Falha ao enviar ${file.name} para o Storage (HTTP ${putResponse.status}).`);
+
+        const finalizeResponse = await fetch("/api/servidor/arquivos/finalize", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            path: signJson.path,
+            destino: signJson.destino,
+            usuarioNome: "Eduardo",
+            modoOrganizacao: modo,
+            relativePath,
+            fileName: file.name,
+            fileSize: file.size,
+            fileType: file.type
+          })
+        });
+
+        const finalizeJson = await finalizeResponse.json();
+        if (!finalizeJson.ok) throw new Error(finalizeJson.erro || `Falha ao registrar ${file.name}`);
+
+        enviados += 1;
+      } catch (error) {
+        falhas.push(`${file.name}: ${error instanceof Error ? error.message : "erro desconhecido"}`);
       }
-
-      setSelecionados([]);
-      setMensagem("Upload concluído. Arquivos salvos no Supabase Storage e registrados no banco.");
-      await carregarArquivos();
-    } catch (error) {
-      setErro(error instanceof Error ? error.message : "Falha no upload.");
-    } finally {
-      setEnviando(false);
     }
+
+    setEnviando(false);
+    setSelecionados([]);
+
+    if (falhas.length === 0) {
+      setMensagem(`Upload concluído. ${enviados} arquivo(s) enviado(s)${ignorados ? ` (${ignorados} ignorado(s) por já existir)` : ""}.`);
+    } else {
+      setErro(`${falhas.length} de ${total} arquivo(s) falharam: ${falhas.slice(0, 5).join(" | ")}${falhas.length > 5 ? "..." : ""}`);
+      if (enviados > 0) setMensagem(`${enviados} de ${total} arquivo(s) enviado(s) com sucesso.`);
+    }
+
+    await carregarArquivos();
   }
 
   async function excluirArquivo(id: string) {

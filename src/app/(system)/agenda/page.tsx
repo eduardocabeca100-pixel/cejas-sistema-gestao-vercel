@@ -8,7 +8,6 @@ import { Card } from "@/components/ui/Card";
 import { Field, SelectInput, TextInput } from "@/components/ui/Form";
 import { MetricCard } from "@/components/ui/MetricCard";
 import { PageHeader } from "@/components/ui/PageHeader";
-import { Badge } from "@/components/ui/Badge";
 
 const weekdays = ["DOM", "SEG", "TER", "QUA", "QUI", "SEX", "SÁB"];
 const monthNames = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
@@ -43,12 +42,6 @@ function buildMonthGrid(year: number, monthIndex: number) {
   }
   return cells;
 }
-
-const statusOptions: Array<{ value: EventStatus; label: string }> = [
-  { value: "confirmado", label: "Confirmar" },
-  { value: "em_espera", label: "Colocar em espera" },
-  { value: "cancelado", label: "Cancelar" }
-];
 
 export default function AgendaPage() {
   const today = new Date();
@@ -184,8 +177,9 @@ export default function AgendaPage() {
               return (
                 <div className={`day-cell ${cell.iso === selectedDate ? "active" : ""}`} key={cell.iso} style={{ opacity: cell.inMonth ? 1 : 0.4 }} onClick={() => setSelectedDate(cell.iso)}>
                   <div className="day-number">{cell.day}</div>
-                  {items.slice(0, 3).map((event) => <button key={event.id} className={`event-pill ${event.status}`} type="button">{event.startTime} {event.room}</button>)}
-                  {items.length > 3 && <small>+{items.length - 3} eventos</small>}
+                  <div className="day-events">
+                    {items.map((event) => <span key={event.id} className={`event-pill ${event.status}`} title={event.title}>{event.title}</span>)}
+                  </div>
                 </div>
               );
             })}
@@ -202,18 +196,12 @@ export default function AgendaPage() {
           {selectedEvents.length === 0 && <p className="muted" style={{ marginTop: 16 }}>Nenhum evento nesta data.</p>}
           {selectedEvents.map((event) => (
             <article className="event-detail-card" key={event.id}>
-              <Badge tone={event.status === "confirmado" ? "green" : event.status === "cancelado" ? "red" : "purple"}>{event.status === "em_espera" ? "EM ESPERA" : event.status.toUpperCase()}</Badge>
               <h3>{event.title}</h3>
-              <p><b>Horário:</b> {event.startTime} até {event.endTime}</p>
-              <p><b>Sala:</b> {event.room}</p>
-              <p><b>Empresa:</b> {event.company}</p>
-              <p><b>Participantes:</b> {event.participants}</p>
-              <p><b>Responsável:</b> {event.responsible}</p>
-              <strong>{formatCurrency(event.amount)}</strong>
-              <div className="action-cell" style={{ marginTop: 10, flexWrap: "wrap" }}>
-                {statusOptions.filter((option) => option.value !== event.status).map((option) => (
-                  <Button key={option.value} variant={option.value === "cancelado" ? "danger" : "dark"} disabled={salvandoStatus === event.id} onClick={() => alterarStatus(event.id, option.value)}>{option.label}</Button>
-                ))}
+              <p className="event-room">{event.startTime}–{event.endTime} · {event.room}</p>
+              <div className="status-dots">
+                <button type="button" title="Confirmar" className={`dot-green ${event.status === "confirmado" ? "active" : ""}`} disabled={salvandoStatus === event.id} onClick={() => alterarStatus(event.id, "confirmado")} />
+                <button type="button" title="Colocar em espera" className={`dot-purple ${event.status === "em_espera" ? "active" : ""}`} disabled={salvandoStatus === event.id} onClick={() => alterarStatus(event.id, "em_espera")} />
+                <button type="button" title="Cancelar" className={`dot-red ${event.status === "cancelado" ? "active" : ""}`} disabled={salvandoStatus === event.id} onClick={() => alterarStatus(event.id, "cancelado")} />
               </div>
             </article>
           ))}

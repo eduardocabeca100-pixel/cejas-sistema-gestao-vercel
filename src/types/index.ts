@@ -14,7 +14,7 @@ export interface DashboardSummary {
   cashBalance: number;
   source: string;
   updatedAt: string;
-  monthlyRevenue: Array<{ month: string; value: number }>;
+  monthlyRevenue: Array<{ month: string; value: number; gratuityLoss: number }>;
 }
 
 export interface CejasEvent {

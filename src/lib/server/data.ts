@@ -21,7 +21,7 @@ export async function getDashboardSummary(): Promise<DashboardSummary> {
 
   const [{ data: events, error: eventsError }, { data: gratuities }, { data: finance }] = await Promise.all([
     supabase.from("events").select("date,status,amount,discount_value"),
-    supabase.from("gratuities").select("loss_value"),
+    supabase.from("gratuities").select("date,loss_value"),
     supabase.from("finance_entries").select("amount,payment_status")
   ]);
 
@@ -38,19 +38,31 @@ export async function getDashboardSummary(): Promise<DashboardSummary> {
   const gratuitiesLoss = (gratuities || []).reduce((sum, item) => sum + Number(item.loss_value || 0), 0);
   const cashBalance = (finance || []).filter((entry) => entry.payment_status === "Pago").reduce((sum, entry) => sum + Number(entry.amount || 0), 0);
 
-  const revenueByMonth = new Map<string, { label: string; value: number }>();
+  const revenueByMonth = new Map<string, { label: string; value: number; gratuityLoss: number }>();
   safeEvents
     .filter((event) => event.status === "confirmado")
     .forEach((event) => {
       const month = monthKey(event.date);
       if (!month) return;
       const current = revenueByMonth.get(month.key);
-      revenueByMonth.set(month.key, { label: month.label, value: (current?.value || 0) + Number(event.amount || 0) });
+      revenueByMonth.set(month.key, { label: month.label, value: (current?.value || 0) + Number(event.amount || 0), gratuityLoss: current?.gratuityLoss || 0 });
     });
+
+  (gratuities || []).forEach((item) => {
+    const month = monthKey(item.date);
+    if (!month) return;
+    const current = revenueByMonth.get(month.key);
+    const loss = Math.abs(Number(item.loss_value || 0));
+    if (current) {
+      revenueByMonth.set(month.key, { ...current, gratuityLoss: current.gratuityLoss + loss });
+    } else {
+      revenueByMonth.set(month.key, { label: month.label, value: 0, gratuityLoss: loss });
+    }
+  });
 
   const monthlyRevenue = Array.from(revenueByMonth.entries())
     .sort(([keyA], [keyB]) => keyA.localeCompare(keyB))
-    .map(([, entry]) => ({ month: entry.label, value: entry.value }));
+    .map(([, entry]) => ({ month: entry.label, value: entry.value, gratuityLoss: entry.gratuityLoss }));
 
   return {
     totalEvents,
