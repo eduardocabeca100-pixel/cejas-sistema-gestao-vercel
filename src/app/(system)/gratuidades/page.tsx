@@ -63,15 +63,18 @@ export default function GratuidadesPage() {
     };
 
     if (editingId) {
-      await fetch("/api/gratuidades", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: editingId, ...payload }) });
+      const response = await fetch("/api/gratuidades", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: editingId, ...payload }) });
+      const json = await response.json().catch(() => ({ ok: false }));
+      if (!response.ok || !json.ok) { window.alert(json.error || "Erro ao salvar as alterações."); return; }
       setEditingId(null);
       carregar();
       return;
     }
 
     const response = await fetch("/api/gratuidades", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
-    const json = await response.json();
-    const item: Gratuity = { id: `grat-${Date.now()}`, ...payload, lossValue: json.gratuity?.loss_value ?? loss };
+    const json = await response.json().catch(() => ({ ok: false }));
+    if (!response.ok || !json.ok) { window.alert(json.error || "Erro ao salvar a gratuidade."); return; }
+    const item: Gratuity = { id: json.gratuity.id, ...payload, lossValue: json.gratuity.loss_value };
     setGratuities((current) => [item, ...current]);
     (event.target as HTMLFormElement).reset();
     setTotalValue("");
@@ -80,17 +83,19 @@ export default function GratuidadesPage() {
 
   async function excluir(id: string) {
     if (!window.confirm("Excluir esta gratuidade?")) return;
-    await fetch(`/api/gratuidades?id=${id}`, { method: "DELETE" });
+    const response = await fetch(`/api/gratuidades?id=${id}`, { method: "DELETE" });
+    const json = await response.json().catch(() => ({ ok: false }));
+    if (!response.ok || !json.ok) { window.alert(json.error || "Erro ao excluir a gratuidade."); return; }
     if (editingId === id) setEditingId(null);
     carregar();
   }
 
   return (
     <div>
-      <PageHeader eyebrow="CONTROLE MANUAL" title="Gratuidades" description="Cadastro manual de gratuidades. Desconto financeiro e gratuidade são controles separados." actions={<Button>Novo lançamento</Button>} />
+      <PageHeader eyebrow="CONTROLE MANUAL" title="Gratuidades" description="Cadastro manual de gratuidades. Desconto financeiro e gratuidade são controles separados." actions={<Button onClick={() => { setEditingId(null); document.getElementById("form-gratuidade")?.scrollIntoView({ behavior: "smooth" }); }}>Novo lançamento</Button>} />
       <div className="grid grid-4"><MetricCard label="Valor total" value={formatCurrency(totals.total)} /><MetricCard label="Valor pago" value={formatCurrency(totals.paid)} tone="green" /><MetricCard label="Valor de perda" value={formatCurrency(totals.loss)} tone="red" /><MetricCard label="Registros" value={gratuities.length} tone="purple" /></div>
       <Card className="filters" style={{ marginTop: 22 }}><h2>Filtros</h2><p>Filtre por período, origem, evento ou órgão.</p><div className="filter-grid"><Field label="De"><TextInput type="date" /></Field><Field label="Até"><TextInput type="date" /></Field><Field label="Origem"><SelectInput><option>Todas</option><option>Manual</option><option>Supera</option></SelectInput></Field><Field label="Buscar"><TextInput placeholder="Evento, órgão, associado..." /></Field><Button>Filtrar</Button></div></Card>
-      <Card className="pad" style={{ marginTop: 22 }}>
+      <Card id="form-gratuidade" className="pad" style={{ marginTop: 22 }}>
         <div className="page-header" style={{ marginBottom: 0 }}><div><h2>{editingId ? "Editar gratuidade" : "Cadastrar gratuidade"}</h2><p>O valor de perda é calculado automaticamente como negativo: valor pago menos valor total.</p></div>{editingId && <Button type="button" variant="dark" onClick={() => setEditingId(null)}>Cancelar edição</Button>}</div>
         <form className="grid" onSubmit={save} key={editingId || "novo"}>
           <div className="grid grid-3"><Field label="Data"><TextInput name="date" type="date" defaultValue={editing?.date} required /></Field><Field label="Evento"><TextInput name="event" placeholder="Nome do evento" defaultValue={editing?.event} required /></Field><Field label="Órgão / associado / não associado"><TextInput name="beneficiary" placeholder="Ex: SCAR, SENAI, PMJS, NÃO ASSOCIADO" defaultValue={editing?.beneficiary} required /></Field></div>

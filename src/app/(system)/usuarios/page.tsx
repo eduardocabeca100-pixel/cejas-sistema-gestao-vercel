@@ -98,7 +98,7 @@ export default function UsuariosPage() {
 
   return (
     <div>
-      <PageHeader eyebrow="CONTROLE DE ACESSO" title="Acessos / Usuários" description="Crie usuários institucionais e escolha mais de uma permissão para cada pessoa." actions={<Button>Voltar ao painel</Button>} />
+      <PageHeader eyebrow="CONTROLE DE ACESSO" title="Acessos / Usuários" description="Crie usuários institucionais e escolha mais de uma permissão para cada pessoa." actions={<Button onClick={() => { window.location.href = "/dashboard"; }}>Voltar ao painel</Button>} />
       <div className="grid grid-2">
         <Card className="pad">
           <h2>{editingId ? `Editar usuário — ${usuarioEmEdicao?.name || ""}` : "Novo usuário"}</h2>

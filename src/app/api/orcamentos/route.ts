@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
 
   if (error || !budget) return NextResponse.json({ ok: false, error: error?.message || "Erro ao salvar orçamento." }, { status: 500 });
   if (Array.isArray(body.items) && body.items.length) {
-    await supabase.from("budget_items").insert(body.items.map((item: any) => ({
+    const { error: itemsError } = await supabase.from("budget_items").insert(body.items.map((item: any) => ({
       budget_id: budget.id,
       rubric: item.rubric,
       description: item.description,
@@ -34,6 +34,7 @@ export async function POST(request: NextRequest) {
       unit_value: item.unitValue,
       details: item.details
     })));
+    if (itemsError) return NextResponse.json({ ok: false, error: `Orçamento salvo, mas os itens não foram gravados: ${itemsError.message}` }, { status: 500 });
   }
   return NextResponse.json({ ok: true, budget });
 }
