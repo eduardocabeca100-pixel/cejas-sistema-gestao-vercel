@@ -1,9 +1,35 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { dashboardSeed } from "@/lib/seed";
 import type { AppUser, Budget, CejasEvent, ChatMessage, Contract, DashboardSummary, FinanceEntry, Gratuity, ServerFile, Task } from "@/types";
 
 function emptyDashboard(source = "Supabase Database • nenhum dado importado ainda"): DashboardSummary {
   return { ...dashboardSeed, source, updatedAt: new Date().toISOString() };
+}
+
+/**
+ * O PostgREST do Supabase limita cada resposta a 1000 linhas por padrão,
+ * mesmo sem `.limit()` explícito. Com mais de um relatório importado a
+ * tabela "events" já passa disso, então buscamos em páginas de 1000 até
+ * a página vir incompleta (senão os meses mais recentes somem do app).
+ */
+async function fetchAllRows<T>(
+  supabase: SupabaseClient,
+  table: string,
+  select: string,
+  orderColumn?: string
+): Promise<T[]> {
+  const pageSize = 1000;
+  const rows: T[] = [];
+  for (let offset = 0; ; offset += pageSize) {
+    let query = supabase.from(table).select(select).range(offset, offset + pageSize - 1);
+    if (orderColumn) query = query.order(orderColumn, { ascending: true });
+    const { data, error } = await query;
+    if (error || !data || data.length === 0) break;
+    rows.push(...(data as T[]));
+    if (data.length < pageSize) break;
+  }
+  return rows;
 }
 
 function monthKey(dateValue?: string | null) {
@@ -19,13 +45,11 @@ export async function getDashboardSummary(): Promise<DashboardSummary> {
   const supabase = createSupabaseAdminClient();
   if (!supabase) return emptyDashboard("Supabase não configurado • sem dados locais de fallback");
 
-  const [{ data: events, error: eventsError }, { data: gratuities }, { data: finance }] = await Promise.all([
-    supabase.from("events").select("date,status,amount,discount_value"),
-    supabase.from("gratuities").select("date,loss_value"),
-    supabase.from("finance_entries").select("amount,payment_status")
+  const [events, gratuities, finance] = await Promise.all([
+    fetchAllRows<{ date: string; status: string; amount: number; discount_value: number }>(supabase, "events", "date,status,amount,discount_value"),
+    fetchAllRows<{ date: string; loss_value: number }>(supabase, "gratuities", "date,loss_value"),
+    fetchAllRows<{ amount: number; payment_status: string }>(supabase, "finance_entries", "amount,payment_status")
   ]);
-
-  if (eventsError) return emptyDashboard(`Erro ao consultar Supabase: ${eventsError.message}`);
 
   const safeEvents = events || [];
   const totalEvents = safeEvents.length;
@@ -60,6 +84,19 @@ export async function getDashboardSummary(): Promise<DashboardSummary> {
     }
   });
 
+  const anosComDados = new Set<number>();
+  safeEvents.forEach((event) => { const d = new Date(`${event.date}T00:00:00`); if (!Number.isNaN(d.getTime())) anosComDados.add(d.getFullYear()); });
+  (gratuities || []).forEach((item) => { const d = new Date(`${item.date}T00:00:00`); if (!Number.isNaN(d.getTime())) anosComDados.add(d.getFullYear()); });
+  if (anosComDados.size === 0) anosComDados.add(new Date().getFullYear());
+
+  Array.from(anosComDados).forEach((ano) => {
+    for (let mes = 0; mes < 12; mes++) {
+      const month = monthKey(`${ano}-${String(mes + 1).padStart(2, "0")}-01`);
+      if (!month) continue;
+      if (!revenueByMonth.has(month.key)) revenueByMonth.set(month.key, { label: month.label, value: 0, gratuityLoss: 0 });
+    }
+  });
+
   const monthlyRevenue = Array.from(revenueByMonth.entries())
     .sort(([keyA], [keyB]) => keyA.localeCompare(keyB))
     .map(([, entry]) => ({ month: entry.label, value: entry.value, gratuityLoss: entry.gratuityLoss }));
@@ -83,9 +120,8 @@ export async function getDashboardSummary(): Promise<DashboardSummary> {
 export async function getEvents(): Promise<CejasEvent[]> {
   const supabase = createSupabaseAdminClient();
   if (!supabase) return [];
-  const { data, error } = await supabase.from("events").select("*").order("date", { ascending: true }).limit(1000);
-  if (error || !data) return [];
-  return data.map((event) => ({
+  const data = await fetchAllRows<Record<string, unknown>>(supabase, "events", "*", "date");
+  return data.map((event: any) => ({
     id: event.id,
     date: event.date,
     startTime: event.start_time || "",

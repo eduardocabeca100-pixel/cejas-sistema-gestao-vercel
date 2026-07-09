@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { dashboardSeed } from "@/lib/seed";
 import { formatCurrency, formatNumber } from "@/lib/format/currency";
 import { Button } from "@/components/ui/Button";
@@ -13,6 +13,29 @@ export default function ImportarRelatorioPage() {
   const [fileName, setFileName] = useState("");
   const [status, setStatus] = useState("Nenhum PDF importado ainda.");
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/import-report/latest", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((json) => {
+        const r = json?.report;
+        if (!r) return;
+        setSummary({
+          ...dashboardSeed,
+          totalEvents: r.total_events,
+          confirmedEvents: r.confirmed_events,
+          pendingEvents: r.pending_events,
+          canceledEvents: r.canceled_events,
+          expectedRevenue: r.expected_revenue,
+          confirmedRevenue: r.confirmed_revenue,
+          discountsApplied: r.discounts_applied,
+          source: "Supabase Database",
+          updatedAt: r.processed_at
+        });
+        setStatus(`Último relatório importado: ${r.original_filename} em ${new Date(r.processed_at).toLocaleString("pt-BR")}.`);
+      })
+      .catch(() => {});
+  }, []);
 
   async function upload(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();

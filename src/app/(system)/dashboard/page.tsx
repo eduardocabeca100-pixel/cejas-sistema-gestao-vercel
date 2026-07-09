@@ -82,14 +82,17 @@ export default function DashboardPage() {
       <Card className="pad" style={{ marginTop: 22 }}>
         <div className="page-header" style={{ marginBottom: 0 }}>
           <div>
-            <h2>Receita mensal confirmada</h2>
-            <p>Valores calculados somente a partir dos registros salvos no Supabase. Enquanto nenhum relatório for importado, o painel permanece zerado.</p>
+            <h2>Receita confirmada por mês</h2>
+            <p>Valores calculados a partir dos registros salvos no Supabase.</p>
           </div>
           <Link href="/gratuidades"><Button>Abrir gratuidades</Button></Link>
         </div>
-        <div className="gratuity-strip">
+        <div style={{ marginTop: 18 }}>
+          <MonthlyRevenueList data={summary.monthlyRevenue} />
+        </div>
+        <div className="gratuity-strip" style={{ marginTop: 18 }}>
           <div>
-            <span className="kicker">GRATUIDADES</span>
+            <span className="kicker">GRATUIDADES (TOTAL)</span>
             <strong>{formatCurrency(summary.gratuitiesLoss)}</strong>
           </div>
           <Link href="/gratuidades"><Button variant="dark">Ver detalhes →</Button></Link>
@@ -112,11 +115,7 @@ export default function DashboardPage() {
         </div>
       </Card>
 
-      <div className="grid grid-3" style={{ marginTop: 22, alignItems: "stretch" }}>
-        <Card className="pad">
-          <h2>Receita confirmada por mês</h2>
-          <MonthlyRevenueList data={summary.monthlyRevenue} />
-        </Card>
+      <div className="grid grid-2" style={{ marginTop: 22, alignItems: "stretch" }}>
         <Card className="pad">
           <h2>Fluxo de Caixa</h2>
           <span className="kicker">SALDO ATUAL</span>

@@ -21,6 +21,8 @@ export interface ParsedAgendaEvent {
   responsible: string;
   amount: number;
   status: "confirmado" | "em_espera" | "cancelado";
+  notes: string;
+  isGratuity: boolean;
 }
 
 function stripAccents(value: string): string {
@@ -59,7 +61,13 @@ function statusFromWord(word: string): "confirmado" | "em_espera" | "cancelado" 
  * Testado contra um export real de 50 páginas / 306 eventos antes de ir pra produção.
  */
 export function parseAgendamentosSalas(rawText: string): { events: ParsedAgendaEvent[]; warnings: string[] } {
-  const normalized = rawText.replace(/N[ÃA]O\s*\n\s*ASSOCIADA/gi, "NÃO ASSOCIADA");
+  // Nomes de empresa longos quebram a linha bem depois do "-" que antecede
+  // ASSOCIADA/NÃO ASSOCIADA (às vezes até em 3 linhas). Junta qualquer linha
+  // terminada em "-" com a próxima antes de dividir em linhas, senão o nome
+  // da empresa nunca bate com COMPANY_RE e o bloco inteiro vira "título".
+  const normalized = rawText
+    .replace(/-\s*\n\s*/g, "- ")
+    .replace(/N[ÃA]O\s*\n\s*ASSOCIADA/gi, "NÃO ASSOCIADA");
   const lines = normalized
     .split(/\r?\n/)
     .map((l) => l.trim())
@@ -95,6 +103,7 @@ export function parseAgendamentosSalas(rawText: string): { events: ParsedAgendaE
 
       let j = i + 8;
       const titleLines: string[] = [];
+      const noteLines: string[] = [];
       let company = "";
       let customerType: "associado" | "nao_associado" = "associado";
       let responsible = "";
@@ -149,21 +158,27 @@ export function parseAgendamentosSalas(rawText: string): { events: ParsedAgendaE
         }
 
         if (!foundCompany) titleLines.push(l2);
+        else if (foundResponsible && !totalMatch) noteLines.push(l2);
         j++;
       }
+
+      const title = titleLines.join(" ").trim() || "(sem título)";
+      const notes = noteLines.join(" ").trim();
 
       events.push({
         date: currentDateIso,
         startTime,
         endTime,
-        title: titleLines.join(" ").trim() || "(sem título)",
+        title,
         company,
         customerType,
         room: currentRoom || "",
         participants: Number(participantsStr) || 0,
         responsible,
         amount: total,
-        status
+        status,
+        notes,
+        isGratuity: /gratuidade/i.test(title) || /gratuidade/i.test(notes)
       });
 
       if (!consumed) warnings.push(`Bloco sem "Resp.:" perto da linha ${i} (${titleLines.join(" ")})`);

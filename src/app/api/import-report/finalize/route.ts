@@ -48,6 +48,32 @@ export async function POST(request: NextRequest) {
     if (insertError) return NextResponse.json({ ok: false, error: `Erro ao salvar eventos (lote ${i / chunkSize + 1}): ${insertError.message}` }, { status: 500 });
   }
 
+  // Eventos com "gratuidade" no título/observações viram lançamentos automáticos
+  // em Gratuidades. Marcamos as observações com "[Supera]" pra identificar e
+  // substituir só os detectados automaticamente em reimportações — gratuidades
+  // cadastradas manualmente pelo usuário nunca são tocadas.
+  const gratuityEvents = events.filter((event) => event.isGratuity);
+  const { error: deleteGratuityError } = await supabase.from("gratuities").delete().ilike("notes", "[Supera]%");
+  if (deleteGratuityError) return NextResponse.json({ ok: false, error: `Erro ao limpar gratuidades anteriores do Supera: ${deleteGratuityError.message}` }, { status: 500 });
+
+  if (gratuityEvents.length) {
+    const gratuityRows = gratuityEvents.map((event) => ({
+      date: event.date,
+      event: event.title,
+      beneficiary: event.company || "Não informado",
+      type: event.customerType,
+      total_value: event.amount,
+      paid_value: 0,
+      loss_value: -event.amount,
+      notes: `[Supera] ${event.notes || event.title}`.slice(0, 500),
+      responsible: event.responsible || "Supera",
+      status: "ativo"
+    }));
+
+    const { error: insertGratuityError } = await supabase.from("gratuities").insert(gratuityRows);
+    if (insertGratuityError) return NextResponse.json({ ok: false, error: `Erro ao salvar gratuidades detectadas: ${insertGratuityError.message}` }, { status: 500 });
+  }
+
   const summary = { ...summarizeEvents(events), original_filename: originalFilename, extracted_text_preview: text.slice(0, 4000) };
   const { data: report, error: reportError } = await supabase.from("reports").insert({ ...summary, storage_path: path, processed_at: new Date().toISOString() }).select().single();
   if (reportError || !report) return NextResponse.json({ ok: false, error: reportError?.message || "Erro ao salvar relatório." }, { status: 500 });
@@ -56,6 +82,6 @@ export async function POST(request: NextRequest) {
     ok: true,
     report,
     summary,
-    message: `${events.length} eventos importados e salvos na Agenda.${warnings.length ? ` (${warnings.length} aviso(s) de leitura, dados aproveitados mesmo assim.)` : ""}`
+    message: `${events.length} eventos importados e salvos na Agenda${gratuityEvents.length ? `, ${gratuityEvents.length} gratuidade(s) detectada(s) e sincronizada(s)` : ""}.${warnings.length ? ` (${warnings.length} aviso(s) de leitura, dados aproveitados mesmo assim.)` : ""}`
   });
 }

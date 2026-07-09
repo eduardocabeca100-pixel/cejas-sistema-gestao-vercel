@@ -195,7 +195,11 @@ export default function AgendaPage() {
           </div>
           {selectedEvents.length === 0 && <p className="muted" style={{ marginTop: 16 }}>Nenhum evento nesta data.</p>}
           {selectedEvents.map((event) => (
-            <article className="event-detail-card" key={event.id}>
+            <article
+              className="event-detail-card"
+              key={event.id}
+              style={{ borderLeftColor: event.status === "confirmado" ? "var(--green)" : event.status === "cancelado" ? "var(--red)" : "var(--purple)" }}
+            >
               <h3>{event.title}</h3>
               <p className="event-room">{event.startTime}–{event.endTime} · {event.room}</p>
               <div className="status-dots">
